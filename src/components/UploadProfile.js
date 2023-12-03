@@ -8,8 +8,7 @@ import Modal from "@/utils/Modal";
 import { IoMdCloseCircle } from "react-icons/io";
 import { LoadingSpin } from "@/utils/LoadingSpin";
 
-const SelectImage = ({ handleGetStudent, setUploadLetter, uploadLetter, id, studentId }) => {
-    // file, prevProfileImage, studentId, status, letterUrl, letterPublicId
+const UploadProfile = ({ handleGetStudent, setUploadProfile, uploadProfile, account }) => {
     const [file, setFile] = useState(null)
     const { showConfirmation, ConfirmationDialog } = useConfirmation();
     const [loading, setLoading] = useState(false)
@@ -28,19 +27,19 @@ const SelectImage = ({ handleGetStudent, setUploadLetter, uploadLetter, id, stud
     };
 
 
-    const handleUploadLetter = async () => {
-        setLoading(!loading)
+    const handleuploadProfile = async () => {
+        setLoading(true)
         try {
-            await axios.put(`${url}/api/uploadLetter/${id}`, {
+            await axios.put(`${url}/api/people/uploadProfile/${account.id}`, {
                 file,
-                studentId,
+                account,
             }, { headers });
-            alert("Successfully uploaded the letter!")
+            alert("Successfully uploaded your profile!")
             handleGetStudent()
-            setLoading(!loading)
-            setUploadLetter(!uploadLetter)
+            setLoading(false)
+            setUploadProfile(false)
         } catch (error) {
-            setLoading(!loading)
+            setLoading(false)
             console.error('An error occurred:', error);
             alert("Something went wrong!")
         }
@@ -50,9 +49,9 @@ const SelectImage = ({ handleGetStudent, setUploadLetter, uploadLetter, id, stud
         e.preventDefault();
         showConfirmation(<div className='grid justify-center gap-4'>
             <div className='bg-red-700 flex items-center text-white gap-4 rounded-t-lg w-full'><FcAddImage size={32} />Save Profile</div>
-            <p className='text-xl text-green-700 p-6'>Are you sure you want to upload this letter?</p>
+            <p className='text-xl text-green-700 p-6'>Are you sure you want to upload this as your profile?</p>
         </div>, () => {
-            handleUploadLetter()
+            handleuploadProfile()
         });
     };
 
@@ -64,13 +63,13 @@ const SelectImage = ({ handleGetStudent, setUploadLetter, uploadLetter, id, stud
                     <button
                         type="button"
                         className="absolute -top-2 -right-2 text-gray-500 hover:text-gray-700 rounded-full bg-white"
-                        onClick={() => setUploadLetter(!uploadLetter)}
+                        onClick={() => setUploadProfile(!uploadProfile)}
                     >
                         <IoMdCloseCircle size={28} style={{ color: 'red' }} />
                     </button>
                     <form onSubmit={handleUpdate} className="grid gap-4 justify-center">
                         <div className="grid justify-center">
-                            <div className="w-60 h-60 object-fill bg-green-700 overflow-hidden border-4 border-white mb-4">
+                            <div className="w-60 h-60 rounded-full object-fill bg-green-700 overflow-hidden border-4 border-white mb-4">
                                 {file && (
                                     <Image
                                         src={file}
@@ -89,17 +88,15 @@ const SelectImage = ({ handleGetStudent, setUploadLetter, uploadLetter, id, stud
                                 <input
                                     id="inputFile"
                                     type="file"
-                                    // className="invisible"
                                     className="w-40 "
                                     onChange={handlePictureChange}
                                     accept="image/jpeg, image/png"
-
+                                    required
                                 />
-                                {/* <label className="text-center absolute top-4 right-4" htmlFor="inputFile">CHOOSE IMAGE</label> */}
                             </div>
                             <button type="submit"
                                 disabled={loading}
-                                className={`bg-green-700 w-40 h-max rounded-lg`}>
+                                className={`bg-green-700 text-white w-40 h-max rounded-lg`}>
                                 {loading ? <LoadingSpin loading={loading} /> : "UPLOAD"}</button>
                         </div>
                     </form>
@@ -109,4 +106,4 @@ const SelectImage = ({ handleGetStudent, setUploadLetter, uploadLetter, id, stud
     );
 }
 
-export default SelectImage;
+export default UploadProfile;
