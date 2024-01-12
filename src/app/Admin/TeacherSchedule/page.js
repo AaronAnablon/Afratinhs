@@ -13,14 +13,17 @@ import { LoadingSpin } from "@/utils/LoadingSpin";
 import { url, headers } from "@/utils/api";
 import useConfirmation from "@/utils/ConfirmationHook";
 import { FcDataProtection } from "react-icons/fc";
-import { FaClipboardList } from "react-icons/fa";
+import { FaClipboardList, FaEdit } from "react-icons/fa";
 import Modal from "@/utils/Modal";
 import useMessageHook from "@/utils/MessageHook";
+import EditTeacherAccount from "./EditTeacherAccount";
 
 const Page = () => {
     const { showMessage, Message } = useMessageHook();
     const { showConfirmation, ConfirmationDialog } = useConfirmation();
     const [add, setAdd] = useState(false)
+    const [edit, setEdit] = useState(false)
+    const [clickedStudent, setClickedStudent] = useState()
     const [teachers, setTeachers] = useState()
     const [success, setSuccess] = useState(false)
     const [loading, setLoading] = useState(false)
@@ -89,6 +92,11 @@ const Page = () => {
         });
     };
 
+    const handleEdit = (student) => {
+        setClickedStudent(student)
+        setEdit(!edit)
+    }
+
     useEffect(() => {
         handleGetData()
     }, [])
@@ -101,6 +109,7 @@ const Page = () => {
                 <Modal>
                     <LoadingSpin loading={loading} />
                 </Modal>}
+            {edit && <EditTeacherAccount setEdit={setEdit} edit={edit} student={clickedStudent} handleGetData={handleGetData} />}
             <div className="flex justify-start md:justify-center mb-20">
                 <ul className="grid w-full gap-2">
                     {teachers?.map((item, index) => (
@@ -110,6 +119,11 @@ const Page = () => {
                                 {item.firstName} {item.lastName}
                             </Link>
                             <div className="flex gap-2">
+                                <button type="button"
+                                    onClick={() => handleEdit(item)}
+                                    className="bg-white border-green-700 border-2 h-max rounded-full text-green-700 p-1">
+                                    <FaEdit size={14} />
+                                </button>
                                 <Link href={`TeacherSchedule/Schedule/?id=${item.id}`}
                                     className="rounded-full bg-white text-yellow-500 h-max p-1">
                                     <FaClipboardList size={15} />
