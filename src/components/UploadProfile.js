@@ -8,6 +8,7 @@ import Modal from "@/utils/Modal";
 import { IoMdCloseCircle } from "react-icons/io";
 import { LoadingSpin } from "@/utils/LoadingSpin";
 import useMessageHook from "@/utils/MessageHook";
+import { BsPersonCircle } from "react-icons/bs";
 
 const UploadProfile = ({ handleGetStudent, setUploadProfile, uploadProfile, account }) => {
     const [file, setFile] = useState(null)
@@ -81,13 +82,14 @@ const UploadProfile = ({ handleGetStudent, setUploadProfile, uploadProfile, acco
                                         className="object-fill"
                                     />
                                     :
-                                    <Image
+                                    account.profile ? <Image
                                         src={account.profile}
                                         alt="Selected"
                                         width={600}
                                         height={600}
                                         className="object-fill"
-                                    />
+                                    /> :
+                                        <BsPersonCircle size={44} />
                                 }
                             </div>
 
