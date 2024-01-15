@@ -135,7 +135,7 @@ const Page = () => {
                                                             <div className="bg-white rounded-full text-red-700 p-1">
                                                                 <IoClose size={16} /></div>}
                                                         {filteredStudent.statusOut === "present" ?
-                                                            <div lassName="bg-white rounded-full text-green-700 p-1">
+                                                            <div className="bg-white rounded-full text-green-700 p-1">
                                                                 <FaCheck size={14} /></div> :
                                                             <div className="bg-white rounded-full text-red-700 p-1">
                                                                 <IoClose size={16} /></div>}
