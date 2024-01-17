@@ -9,7 +9,11 @@ export const DELETE = async (request, { params }) => {
                 section
             }
         });
-
+        await prisma.people.deleteMany({
+            where: {
+                section
+            }
+        });
         return NextResponse.json("Post has been deleted");
     } catch (err) {
         console.log(err)
