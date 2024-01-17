@@ -12,6 +12,8 @@ const EditStudent = ({ setEdit, edit, student, handleGetData }) => {
     const [teachers, setTeachers] = useState()
     const [changePass, setChangePass] = useState()
     const [uploading, setUploading] = useState()
+    const [sections, setSections] = useState()
+    const [attendance, setAttendance] = useState()
     const { showMessage, Message } = useMessageHook();
     const [data, setData] = useState({
         firstName: student.firstName,
@@ -32,6 +34,33 @@ const EditStudent = ({ setEdit, edit, student, handleGetData }) => {
             [name]: value,
         }));
     };
+
+    const handleGetSections = async () => {
+        try {
+            const response = await axios.get(`${url}/api/attendance`, { headers });
+            setAttendance(response.data)
+        } catch (err) {
+            showMessage("Something went wrong!")
+            console.log(err);
+        }
+    }
+
+    useEffect(() => {
+        setSections(new Set(attendance?.map(section => section.section)))
+    }, [attendance])
+
+
+    const checkSection = () => {
+        const sect = sections?.has(data.section);
+        if (sect) {
+            return sect
+        } else {
+            showMessage("Section is not available in any attendance record!")
+            return sect
+        }
+
+    }
+
 
     useEffect(() => {
         if (data.password !== data.confirmPassword) {
@@ -60,13 +89,20 @@ const EditStudent = ({ setEdit, edit, student, handleGetData }) => {
         return true;
     };
 
+
+
     const handleSubmit = async (event) => {
         event.preventDefault();
-        if (!validatePassword(data.password)) {
+        setUploading(true)
+        if (data.password !== "" && !validatePassword(data.password)) {
             setUploading(false);
             return;
         }
-        setUploading(true)
+        const sectionAvailable = checkSection()
+        if (!sectionAvailable) {
+            setUploading(false);
+            return;
+        }
         try {
             const response = await
                 axios.put(`${url}/api/people/${student.id}`,
@@ -95,6 +131,7 @@ const EditStudent = ({ setEdit, edit, student, handleGetData }) => {
 
     useEffect(() => {
         handleGetTeachers()
+        handleGetSections()
     }, [])
 
     return (
