@@ -9,7 +9,9 @@ import { HiOutlineArrowRightOnRectangle, HiOutlineCamera, HiOutlineFaceSmile } f
 import { ROLE_HOME, ROLE_NAMES } from "@/globalData/roles";
 import { isDemoEmail } from "@/globalData/demoAccounts";
 import { useFetch } from "@/utils/http";
+import { DemoGuide } from "./DemoGuide";
 import { Avatar, fullName } from "./ui/Avatar";
+import { ErrorState } from "./ui/EmptyState";
 import { useConfirm } from "./ui/Feedback";
 import { PageLoader } from "./ui/Spinner";
 import { ProfilePhotoDialog } from "./ProfilePhotoDialog";
@@ -45,17 +47,39 @@ export const AppShell = ({ role, nav, children }) => {
     const [menuOpen, setMenuOpen] = useState(false);
 
     const allowed = status === "authenticated" && session?.role === role;
+    const isDemo = allowed && (session.isDemo === true || isDemoEmail(session.email));
     const { data: profile, reload } = useFetch(allowed ? `/api/people/${session.id}` : null);
+    // Demo visitors need an active visitor cookie (their own copy of the demo
+    // data) and a registered face before they can use the app.
+    const demo = useFetch(isDemo ? "/api/demo/session" : null);
+    const demoReady = !isDemo || (demo.data?.visitor && demo.data.face.registered);
+    // Check again on every page change, e.g. after the visitor's 24 hours are
+    // up, and so the demo guide sees attendance that was just saved.
+    const [demoPath, setDemoPath] = useState(pathname);
+    if (demoPath !== pathname) {
+        setDemoPath(pathname);
+        demo.reload();
+    }
 
     useEffect(() => {
         if (status === "unauthenticated") router.replace("/");
         else if (status === "authenticated" && session?.role !== role) router.replace(ROLE_HOME[session?.role] ?? "/");
     }, [status, session, role, router]);
 
+    useEffect(() => {
+        if (!demo.data) return;
+        if (!demo.data.visitor) router.replace("/AuthenticateAccount");
+        else if (!demo.data.face.registered) router.replace("/DemoFace");
+    }, [demo.data, router]);
+
     if (!allowed) return <PageLoader />;
+    if (!demoReady) {
+        return demo.error
+            ? <main className="grid min-h-screen place-items-center px-4"><ErrorState message={demo.error} onRetry={demo.reload} /></main>
+            : <PageLoader />;
+    }
 
     const user = profile ?? session;
-    const isDemo = session.isDemo === true || isDemoEmail(session.email);
     const home = ROLE_HOME[role];
 
     const logOut = async () => {
@@ -153,12 +177,10 @@ export const AppShell = ({ role, nav, children }) => {
             </header>
 
             <main className="pb-24 lg:pb-10 lg:pl-64">
-                {isDemo && (
-                    <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs text-amber-900 sm:text-sm">
-                        You&apos;re using a demo account. Changes are shared with other demo visitors and reset every night.
-                    </div>
-                )}
-                <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</div>
+                <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+                    {isDemo && <DemoGuide role={role} status={demo.data} reload={demo.reload} showSteps={isDemoEmail(session.email)} />}
+                    {children}
+                </div>
             </main>
 
             <nav

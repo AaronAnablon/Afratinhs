@@ -23,6 +23,9 @@ model People {
     role            Int
     // true for records that belong to the public demo; demo users only see these
     isDemo          Boolean?
+    // The demo visitor whose copy of the demo data this is. Unset on the three
+    // shared demo accounts.
+    demoVisitorId   String?
     createdAt       DateTime @default(now())
     updatedAt       DateTime @updatedAt
 }
@@ -34,12 +37,23 @@ model Facephotos {
     photoUrl       String
     faceDescriptor String
     isDemo         Boolean?
+    demoVisitorId  String?
     createdAt      DateTime @default(now())
     updatedAt      DateTime @updatedAt
 }
 
-// Face data registered by demo visitors. No photo is stored, only the
-// descriptor, and rows expire 24 hours after createdAt.
+// A demo visitor's browser, identified by the random ID in its
+// afratinhs_visitor cookie. Each visitor gets their own copy of the premade
+// demo data; it and everything tagged with the visitorId is deleted 24 hours
+// after createdAt, when the cookie also expires.
+model Demovisitors {
+    id        String   @id @default(auto()) @map("_id") @db.ObjectId
+    visitorId String
+    createdAt DateTime @default(now())
+}
+
+// Face data registered by demo visitors, one row per photo (3 per visitor).
+// No photo is stored, only the descriptor.
 model Demofaces {
     id             String   @id @default(auto()) @map("_id") @db.ObjectId
     visitorId      String
@@ -48,18 +62,22 @@ model Demofaces {
 }
 
 model Attendance {
-    id        String   @id @default(auto()) @map("_id") @db.ObjectId
-    isOn      Boolean
-    date      String
-    time      String
-    teacher   String
-    event     String
-    code      Int?
-    section   String
-    students  Json?
-    isDemo    Boolean?
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+    id            String   @id @default(auto()) @map("_id") @db.ObjectId
+    isOn          Boolean
+    date          String
+    time          String
+    teacher       String
+    event         String
+    code          Int?
+    section       String
+    students      Json?
+    isDemo        Boolean?
+    // The demo visitor whose copy of the demo data this is.
+    demoVisitorId String?
+    // true for the 20-minute class created when a demo visitor logs in
+    demoLive      Boolean?
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
 }
 
 model Status {

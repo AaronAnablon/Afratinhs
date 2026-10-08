@@ -3,6 +3,9 @@ import prisma from "@/utils/prismadb"
 import CredentialsProvider from 'next-auth/providers/credentials'
 import bcrypt from 'bcrypt'
 import { AUTH_SECRET } from '@/utils/authSecret'
+import { isDemoEmail } from '@/globalData/demoAccounts'
+import { ensureDemoAccounts } from '@/utils/demoSeed'
+import { getVisitorId } from '@/utils/demoVisitor'
 
 
 
@@ -15,10 +18,28 @@ const handler = NextAuth({
                 password: { label: 'Password', type: 'password' }
             },
             async authorize(credentials) {
-                const user = await prisma.people.findFirst({
-                    where: { email: { equals: String(credentials.email).trim(), mode: "insensitive" } }
+                const email = String(credentials.email).trim();
+                // Demo logins always find their accounts ready.
+                if (isDemoEmail(email.toLowerCase())) {
+                    await ensureDemoAccounts(prisma).catch((error) => console.error("Demo account check failed", error));
+                }
+                // Every demo visitor's copy of the demo data reuses the same
+                // emails, so only real accounts, the shared demo accounts and
+                // this browser's own demo data can log in, and the password
+                // decides between them.
+                const visitorId = await getVisitorId();
+                const candidates = await prisma.people.findMany({
+                    where: {
+                        email: { equals: email, mode: "insensitive" },
+                        OR: [
+                            { demoVisitorId: { isSet: false } },
+                            { demoVisitorId: null },
+                            ...(visitorId ? [{ demoVisitorId: visitorId }] : []),
+                        ],
+                    }
                 });
-                if (user && bcrypt.compareSync(credentials.password, user.password)) {
+                const user = candidates.find((person) => bcrypt.compareSync(credentials.password, person.password));
+                if (user) {
                     // Never put the password hash in the session.
                     const { password, ...safeUser } = user
                     return safeUser

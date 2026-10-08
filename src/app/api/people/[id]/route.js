@@ -25,7 +25,7 @@ export const PUT = withAuth([ADMIN], async (request, { params }, user) => {
     const { data } = await readJson(request);
     requireFields(data, ["firstName", "lastName", "email"]);
     const email = data.email.trim().toLowerCase();
-    await assertEmailAvailable(email, person.id);
+    await assertEmailAvailable(user, email, person.id);
 
     const updateData = {
         firstName: data.firstName.trim(),

@@ -1,7 +1,7 @@
 import prisma from "@/utils/prismadb"
 import { NextResponse } from "next/server";
 import {
-    ADMIN, ApiError, TEACHER, findAttendanceFor, isObjectId, readJson,
+    ADMIN, ApiError, TEACHER, findAttendanceFor, isObjectId, peopleScopeOf, readJson,
     requireFields, scopeOf, sectionStudents, withAuth,
 } from "@/utils/apiAuth";
 
@@ -22,7 +22,7 @@ export const PUT = withAuth([ADMIN], async (request, { params }, user) => {
     requireFields(data, ["date", "time", "teacher", "event", "section"]);
 
     const teacherAccount = isObjectId(data.teacher) && await prisma.people.findFirst({
-        where: { id: data.teacher, role: TEACHER, ...scopeOf(user) },
+        where: { id: data.teacher, role: TEACHER, ...peopleScopeOf(user) },
     });
     if (!teacherAccount) throw new ApiError(404, "Teacher not found.");
 

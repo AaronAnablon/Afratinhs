@@ -13,10 +13,13 @@ cloudinary.config({
 
 // Saves a face photo for a student so the camera can recognize them.
 export const POST = withAuth([ADMIN], async (request, context, user) => {
+    // Demo data is shared by every visitor, so a photo saved here would show a
+    // visitor's face to the others. Visitors register their own face instead.
+    if (user.isDemo) throw new ApiError(403, "In the demo, register your own face on the Register your face page.");
+
     const { owner, facePhoto, faceDescriptor } = await readJson(request);
     const student = await findPersonFor(user, owner);
     if (student.role !== STUDENT) throw new ApiError(400, "Face photos are only for students.");
-    // Demo visitors register their own face instead, so they never share one.
     if (isDemoEmail(student.email)) {
         throw new ApiError(403, "Demo visitors register their face on the Register your face page.");
     }

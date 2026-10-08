@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
-import { HiOutlineFaceSmile, HiOutlineTrash } from "react-icons/hi2";
+import { HiOutlineCheckCircle, HiOutlineFaceSmile, HiOutlineTrash } from "react-icons/hi2";
+import { useCurrentUser } from "@/components/AppShell";
 import { FaceCapture } from "@/components/face/FaceCapture";
 import { fullName } from "@/components/ui/Avatar";
 import { ButtonLink, IconButton } from "@/components/ui/Button";
@@ -12,17 +13,19 @@ import { EmptyState, ErrorState } from "@/components/ui/EmptyState";
 import { useConfirm, useToast } from "@/components/ui/Feedback";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PageLoader } from "@/components/ui/Spinner";
-import { isDemoEmail } from "@/globalData/demoAccounts";
+import { DEMO_FACE_PHOTOS, isDemoEmail } from "@/globalData/demoAccounts";
 import { api, errorMessage, useFetch } from "@/utils/http";
 import { withSuspense } from "@/utils/withSuspense";
 
 const FacePhotosPage = () => {
     const toast = useToast();
     const confirm = useConfirm();
+    const { isDemo } = useCurrentUser();
     const studentId = useSearchParams().get("id");
     const student = useFetch(studentId ? `/api/people/${studentId}` : null);
     const isDemoStudent = isDemoEmail(student.data?.email);
-    const photos = useFetch(student.data && !isDemoStudent ? `/api/facePhotos/${studentId}` : null);
+    const photos = useFetch(student.data && !isDemo ? `/api/facePhotos/${studentId}` : null);
+    const demoFace = useFetch(isDemo && isDemoStudent ? "/api/demoFace" : null);
     const [saving, setSaving] = useState(false);
 
     if (student.error) return <ErrorState message={student.error} onRetry={student.reload} />;
@@ -30,17 +33,41 @@ const FacePhotosPage = () => {
 
     const back = { href: `/Admin/Sections/Students/StudentAttendance?id=${studentId}`, label: fullName(student.data) };
 
-    // Demo visitors each register their own face, so the shared uploader is hidden.
-    if (isDemoStudent) {
+    // Demo data is shared by every visitor, so the photo uploader is hidden in the
+    // demo. Each visitor registers their own face for Demo Student instead.
+    if (isDemo) {
         return (
             <>
                 <PageHeader back={back} title="Face photos" description={fullName(student.data)} />
-                <EmptyState
-                    icon={HiOutlineFaceSmile}
-                    title="Demo visitors use their own face"
-                    description="Each visitor registers their own face for Demo Student, so no two visitors share one."
-                    action={<ButtonLink href="/DemoFace">Register your face</ButtonLink>}
-                />
+                {isDemoStudent ? (
+                    <Card className="max-w-2xl">
+                        <CardHeader title="Demo Student's face is your own" description="Each visitor registers their own face, so no two visitors share one." />
+                        <div className="grid gap-4 p-5">
+                            <p className="text-sm text-slate-600">
+                                You take {DEMO_FACE_PHOTOS} photos of your face from slightly different angles. The camera compares every
+                                face it sees with all {DEMO_FACE_PHOTOS}, so attendance is checked more accurately.
+                            </p>
+                            {demoFace.loading ? <PageLoader /> : demoFace.data?.registered ? (
+                                <p className="flex items-center gap-2 text-sm font-medium text-brand-700">
+                                    <HiOutlineCheckCircle className="h-5 w-5" aria-hidden="true" />
+                                    Registered with {demoFace.data.photos} photos. Deleted on {new Date(demoFace.data.expiresAt).toLocaleString()}.
+                                </p>
+                            ) : (
+                                <p className="text-sm font-medium text-amber-700">Not registered yet. Until you do, the camera can&apos;t recognize Demo Student.</p>
+                            )}
+                            <div>
+                                <ButtonLink href="/DemoFace">{demoFace.data?.registered ? "Update your face" : "Register your face"}</ButtonLink>
+                            </div>
+                        </div>
+                    </Card>
+                ) : (
+                    <EmptyState
+                        icon={HiOutlineFaceSmile}
+                        title="Sample students have no face photos"
+                        description={`Demo data is shared by every visitor, so face photos are turned off for other students. Register your own face with ${DEMO_FACE_PHOTOS} photos and the camera recognizes you as Demo Student.`}
+                        action={<ButtonLink href="/DemoFace">Register your face</ButtonLink>}
+                    />
+                )}
             </>
         );
     }
@@ -71,7 +98,7 @@ const FacePhotosPage = () => {
 
     return (
         <>
-            <PageHeader back={back} title="Face photos" description={`The camera recognizes ${student.data.firstName} using these photos. Add 2 or 3 clear, front-facing ones.`} />
+            <PageHeader back={back} title="Face photos" description={`The camera recognizes ${student.data.firstName} using these photos. Add 3 clear ones from slightly different angles for the most accurate attendance.`} />
             <div className="grid gap-6 lg:grid-cols-2">
                 <Card>
                     <CardHeader title="Add a face photo" description="Good light, face the camera, nobody else in view." />

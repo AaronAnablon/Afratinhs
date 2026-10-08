@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { HiOutlineCheck, HiOutlineCheckCircle, HiOutlineFaceSmile, HiOutlinePlay, HiOutlineVideoCamera } from "react-icons/hi2";
 import { createMatcher } from "@/app/faceUtil";
 import { useCurrentUser } from "@/components/AppShell";
+import { refreshDemoGuide } from "@/components/DemoGuide";
 import { LiveRecognition } from "@/components/face/LiveRecognition";
 import { Avatar, fullName } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
@@ -16,6 +17,7 @@ import { useToast } from "@/components/ui/Feedback";
 import { Segmented } from "@/components/ui/Field";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PageLoader } from "@/components/ui/Spinner";
+import { DEMO_FACE_PHOTOS } from "@/globalData/demoAccounts";
 import { api, errorMessage, useFetch } from "@/utils/http";
 import { displayTime, parseClassDate, relativeDayLabel } from "@/utils/schedule";
 import { withSuspense } from "@/utils/withSuspense";
@@ -58,6 +60,7 @@ const RecordAttendancePage = () => {
                 status: check === "in",
             });
             record.mutate(data);
+            if (isDemo) refreshDemoGuide();
             toast.success(`${recognized.length} ${recognized.length === 1 ? "student" : "students"} marked present for ${check.toUpperCase()}.`);
             setRecording(false);
             setRecognized([]);
@@ -115,7 +118,7 @@ const RecordAttendancePage = () => {
                                 icon={HiOutlineFaceSmile}
                                 title="No faces to recognize yet"
                                 description={isDemo
-                                    ? "Register your face first. The camera will then recognize you as Demo Student."
+                                    ? `Register your face first (${DEMO_FACE_PHOTOS} photos). The camera will then recognize you as Demo Student.`
                                     : `Ask your admin to add face photos for the students in ${record.data.section}. You can still mark attendance on the sheet.`}
                                 action={isDemo && <ButtonLink href="/DemoFace">Register your face</ButtonLink>}
                             />

@@ -2,7 +2,7 @@ import prisma from "@/utils/prismadb"
 import { NextResponse } from "next/server"
 import {
     ADMIN, ApiError, TEACHER, demoStamp, generateUniqueCode, isObjectId, readJson,
-    requireFields, scopeOf, sectionStudents, withAuth,
+    peopleScopeOf, requireFields, scopeOf, sectionStudents, withAuth,
 } from "@/utils/apiAuth"
 
 // Creates one class schedule per date for a teacher. The student list is
@@ -13,7 +13,7 @@ export const POST = withAuth([ADMIN], async (request, context, user) => {
     if (!Array.isArray(dates) || dates.length === 0) throw new ApiError(400, "Pick at least one date.");
 
     const teacherAccount = isObjectId(teacher) && await prisma.people.findFirst({
-        where: { id: teacher, role: TEACHER, ...scopeOf(user) },
+        where: { id: teacher, role: TEACHER, ...peopleScopeOf(user) },
     });
     if (!teacherAccount) throw new ApiError(404, "Teacher not found.");
 

@@ -1,6 +1,6 @@
 import prisma from "@/utils/prismadb"
 import { NextResponse } from "next/server"
-import { ADMIN, ApiError, STUDENT, TEACHER, scopeOf, withAuth, withoutPassword } from "@/utils/apiAuth"
+import { ADMIN, ApiError, STUDENT, TEACHER, peopleScopeOf, scopeOf, withAuth, withoutPassword } from "@/utils/apiAuth"
 
 // Students of a section. Teachers can only list sections they teach.
 export const GET = withAuth([ADMIN, TEACHER], async (request, { params }, user) => {
@@ -12,7 +12,7 @@ export const GET = withAuth([ADMIN, TEACHER], async (request, { params }, user) 
         });
         if (!teaches) throw new ApiError(403, "You don't teach this section.");
     }
-    const post = await prisma.people.findMany({ where: { section, role: STUDENT, ...scopeOf(user) } });
+    const post = await prisma.people.findMany({ where: { section, role: STUDENT, ...peopleScopeOf(user) } });
     return NextResponse.json(post.map(withoutPassword));
 });
 

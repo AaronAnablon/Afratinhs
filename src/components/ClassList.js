@@ -31,6 +31,7 @@ export const ClassList = ({ records, order = "asc", renderActions, renderMeta, s
                                         <p className="truncate text-sm font-semibold text-slate-900">{record.event}</p>
                                         <div className="mt-1 flex flex-wrap items-center gap-1.5">
                                             <Badge tone="brand">{record.section}</Badge>
+                                            {record.demoLive && <Badge tone="amber">Started when you logged in</Badge>}
                                             {showCode && <Badge>Code {record.code}</Badge>}
                                             {renderMeta?.(record)}
                                         </div>

@@ -19,10 +19,10 @@ const faceHint = (count) => {
 
 // Takes one face from the webcam or an uploaded photo and hands back
 // onSave(photoDataUrl, descriptorText). Requires exactly one face.
-export const FaceCapture = ({ onSave, saving = false, saveLabel = "Save face" }) => {
+export const FaceCapture = ({ onSave, saving = false, saveLabel = "Save face", initialMode = "camera", onModeChange }) => {
     const { ready, error } = useFaceModels();
     const cameraRef = useRef(null);
-    const [mode, setMode] = useState("camera");
+    const [mode, setMode] = useState(initialMode);
     const [liveCount, setLiveCount] = useState(null);
     const [captured, setCaptured] = useState(null);
     const [problem, setProblem] = useState("");
@@ -78,6 +78,7 @@ export const FaceCapture = ({ onSave, saving = false, saveLabel = "Save face" })
 
     const switchMode = (value) => {
         setMode(value);
+        onModeChange?.(value);
         setCaptured(null);
         setProblem("");
         setLiveCount(null);

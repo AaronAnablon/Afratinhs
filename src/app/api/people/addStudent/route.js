@@ -12,7 +12,7 @@ export const POST = withAuth([ADMIN], async (request, context, user) => {
     requireFields(body, ["firstName", "lastName", "email", "password", "section"]);
 
     const email = body.email.trim().toLowerCase();
-    await assertEmailAvailable(email);
+    await assertEmailAvailable(user, email);
     const section = body.section.trim();
     const newPost = await prisma.people.create({
         data: {

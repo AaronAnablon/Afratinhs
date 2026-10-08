@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 import bcrypt from 'bcrypt';
 import {
     ADMIN, ApiError, TEACHER, assertEmailAvailable, demoStamp, readJson,
-    requireFields, scopeOf, withAuth, withoutPassword,
+    peopleScopeOf, requireFields, withAuth, withoutPassword,
 } from "@/utils/apiAuth"
 
 // Creates a teacher or admin account. Students are created through addStudent.
@@ -14,7 +14,7 @@ export const POST = withAuth([ADMIN], async (request, context, user) => {
     if (![ADMIN, TEACHER].includes(role)) throw new ApiError(400, "Invalid role.");
 
     const email = body.email.trim().toLowerCase();
-    await assertEmailAvailable(email);
+    await assertEmailAvailable(user, email);
     const newPost = await prisma.people.create({
         data: {
             firstName: body.firstName.trim(),
@@ -29,7 +29,7 @@ export const POST = withAuth([ADMIN], async (request, context, user) => {
 });
 
 export const GET = withAuth([ADMIN], async (request, context, user) => {
-    const posts = await prisma.people.findMany({ where: scopeOf(user) })
+    const posts = await prisma.people.findMany({ where: peopleScopeOf(user) })
     return NextResponse.json(posts.map(withoutPassword));
 });
 

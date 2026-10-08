@@ -7,16 +7,24 @@ Attendance Facial Recognition App for Talangan Integrated National High School. 
 The homepage lists demo Admin, Teacher and Student logins that visitors can use with one click. The emails and passwords are in `src/globalData/demoAccounts/accounts.json`.
 
 1. Copy `.env.local.example` to `.env.local` and fill in the database, `NEXTAUTH_SECRET` and Cloudinary values.
-2. Run `npm run seed:demo` to create the three accounts, a "Demo Section" and a few class schedules in that database. Running it again resets all demo data.
-3. On Vercel, set `NEXTAUTH_SECRET` (required, logins fail without it) and `CRON_SECRET` to long random strings. `vercel.json` calls `/api/demo/reset` every night at 16:00 UTC (midnight in the Philippines) to rebuild the demo data.
+2. That's it: the first demo login creates the accounts. `npm run seed:demo` rebuilds them and deletes every visitor's demo data.
+3. On Vercel, set `NEXTAUTH_SECRET` (required, logins fail without it) and `CRON_SECRET` to long random strings. `vercel.json` calls `/api/demo/reset` every night at 16:00 UTC (midnight in the Philippines) to delete expired visitors' data.
 
-How the demo works:
+Every visitor gets their own demo (`src/utils/demoVisitor.js`):
 
-- Demo data is kept apart from real school data. Records created by demo accounts are marked `isDemo`; demo users only ever see those, and real users never see them. The nightly reset deletes everything demo users created.
-- The first time a visitor logs in with a demo account, they register their face at `/DemoFace` (webcam or photo, with consent). Only the 128-number face descriptor is stored, never the photo.
-- The face is tied to a random ID in a browser cookie, so visitors never share faces. When the demo Teacher records attendance, the only face used for Demo Student is the current visitor's.
-- Visitor faces are deleted after 24 hours, or right away with "Delete my face".
-- The three demo accounts can't be edited, deleted or given a profile photo.
+- A browser that logs into a demo account without an `afratinhs_visitor` cookie, or with an expired one, is a new visitor: it gets a new random ID in that cookie (a `Demovisitors` record) and its own copy of the premade data. Records in that copy are tagged with the ID (`demoVisitorId`), and demo users only ever see their own copy plus the three shared demo accounts, so visitors never see each other's changes.
+- A new visitor has to register their face at `/DemoFace` before using the app, whichever demo account they logged in with. It takes 3 photos from slightly different angles (webcam or uploaded, with consent), which makes recognition more accurate. Only the 128-number face descriptors are stored, never the photos.
+- When the demo Teacher records attendance, the only face used for Demo Student is the current visitor's. Face photo uploads for other students are turned off in the demo.
+- After 24 hours the cookie expires and the visitor's data and face are deleted; the next login starts over as a new visitor.
+- Each login also starts a 20-minute "Live demo class" for Demo Teacher and Grade 10 - Rizal in the visitor's own time zone, so attendance can be taken right away. Logging in again within those 20 minutes, e.g. as another role, keeps the same class.
+- A demo guide at the top of every page lists what to try for the current role, checks off steps as the visitor goes, and can switch to another demo account in one click.
+- The three demo accounts are shared by all visitors and can't be edited, deleted or given a profile photo.
+
+Premade data in each visitor's copy (`src/utils/demoSeed.js`):
+
+- Demo Teacher plus two sample teachers, and three sections (Grade 10 - Rizal, Grade 9 - Mabini, Grade 8 - Luna) with 19 sample students. Demo Student is in Grade 10 - Rizal.
+- The same daily timetable from 3 days ago to 3 days ahead, dated in the visitor's time zone. Past classes have attendance taken, and Demo Student missed one so visitors can upload an excuse letter.
+- Sample people can't log in and have no face photos. Accounts a visitor creates can log in, but only from that visitor's browser.
 
 To turn the demo off on a deployment, set `NEXT_PUBLIC_DEMO_MODE=false`.
 

@@ -2,8 +2,9 @@ import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
 import prisma from "@/utils/prismadb";
 import { AUTH_SECRET } from "@/utils/authSecret";
-import { isDemoEmail } from "@/globalData/demoAccounts";
+import { DEMO_EMAILS, isDemoEmail } from "@/globalData/demoAccounts";
 import { ADMIN, STUDENT, TEACHER } from "@/globalData/roles";
+import { VISITOR_COOKIE } from "@/utils/demoVisitor";
 
 export class ApiError extends Error {
     constructor(status, message) {
@@ -15,11 +16,14 @@ export class ApiError extends Error {
 const getSessionUser = async (request) => {
     const token = await getToken({ req: request, secret: AUTH_SECRET });
     if (!token?.id) return null;
+    const isDemo = token.isDemo === true || isDemoEmail(token.email);
     return {
         id: token.id,
         role: token.role,
         email: token.email,
-        isDemo: token.isDemo === true || isDemoEmail(token.email),
+        isDemo,
+        // The demo visitor's browser, which owns its own copy of the demo data.
+        visitorId: isDemo ? request.cookies.get(VISITOR_COOKIE)?.value : undefined,
     };
 };
 
@@ -40,14 +44,30 @@ export const withAuth = (roles, handler) => async (request, context) => {
     }
 };
 
-// Demo users only ever see demo records, and real users never see them.
+// Demo users only ever see their own visitor's copy of the demo data (see
+// utils/demoVisitor), and real users never see demo records.
 // Real records usually have no isDemo field at all, and on MongoDB Prisma's
 // `not: true` skips missing fields, so match "not set, false or null" instead.
 const REAL_RECORDS = { AND: [{ OR: [{ isDemo: { isSet: false } }, { isDemo: false }, { isDemo: null }] }] };
-export const scopeOf = (user) => (user.isDemo ? { isDemo: true } : REAL_RECORDS);
 
-// Marks records created by demo users so they stay inside the demo.
-export const demoStamp = (user) => (user.isDemo ? { isDemo: true } : {});
+// Never stored, so a demo user without a visitor cookie matches nothing.
+const NO_VISITOR = "none";
+const visitorOf = (user) => user.visitorId || NO_VISITOR;
+
+// Classes and face photos the user may see.
+export const scopeOf = (user) => (user.isDemo ? { isDemo: true, demoVisitorId: visitorOf(user) } : REAL_RECORDS);
+
+// People the user may see. Demo users also see the three shared demo accounts.
+export const peopleScopeOf = (user) => (user.isDemo
+    ? { isDemo: true, AND: [{ OR: [{ demoVisitorId: visitorOf(user) }, { email: { in: DEMO_EMAILS } }] }] }
+    : REAL_RECORDS);
+
+// Marks records created by demo users so they stay inside their visitor's demo.
+export const demoStamp = (user) => {
+    if (!user.isDemo) return {};
+    if (!user.visitorId) throw new ApiError(401, "Your demo has ended. Please log in with a demo account again.");
+    return { isDemo: true, demoVisitorId: user.visitorId };
+};
 
 export const withoutPassword = (person) => {
     if (!person) return person;
@@ -70,14 +90,20 @@ export const requireFields = (data, fields) => {
     if (missing.length) throw new ApiError(400, `Please fill in: ${missing.join(", ")}.`);
 };
 
-// Emails must be unique across the whole database (not just the user's scope),
-// otherwise a demo account could shadow a real person's login.
-export const assertEmailAvailable = async (email, exceptId) => {
-    const existing = await prisma.people.findFirst({
-        where: { email: { equals: email.trim(), mode: "insensitive" } },
+// Emails must be unique among the people the user works with, and the demo
+// account emails are always taken. Every demo visitor's copy of the sample
+// data reuses the same emails, so other visitors' copies don't count. (Logins
+// only look at real accounts, the demo accounts and the browser's own demo
+// data, so no account can shadow another one's login.)
+export const assertEmailAvailable = async (user, email, exceptId) => {
+    const existing = await prisma.people.findMany({
+        where: {
+            email: { equals: email.trim(), mode: "insensitive" },
+            AND: [{ OR: [peopleScopeOf(user), { email: { in: DEMO_EMAILS } }] }],
+        },
         select: { id: true },
     });
-    if (existing && existing.id !== exceptId) throw new ApiError(409, "That email is already used by another account.");
+    if (existing.some((person) => person.id !== exceptId)) throw new ApiError(409, "That email is already used by another account.");
 };
 
 // A person the current user may see: themselves, or anyone in scope for admins and teachers.
@@ -85,7 +111,7 @@ export const findPersonFor = async (user, id) => {
     if (!isObjectId(id)) throw new ApiError(404, "Account not found.");
     if (id !== user.id && user.role === STUDENT) throw new ApiError(403, "You don't have access to this.");
     const person = await prisma.people.findFirst({
-        where: id === user.id ? { id } : { id, ...scopeOf(user) },
+        where: id === user.id ? { id } : { id, ...peopleScopeOf(user) },
     });
     if (!person) throw new ApiError(404, "Account not found.");
     return person;
@@ -134,7 +160,7 @@ export const removeStudentFromSection = async (user, studentId, section) => {
 
 export const sectionStudents = async (user, section) => {
     const students = await prisma.people.findMany({
-        where: { section, role: STUDENT, ...scopeOf(user) },
+        where: { section, role: STUDENT, ...peopleScopeOf(user) },
         select: { id: true },
     });
     return students.map((student) => newStudentEntry(student.id));

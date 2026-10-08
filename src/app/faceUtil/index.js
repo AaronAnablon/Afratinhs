@@ -35,6 +35,9 @@ export const descriptorToString = (descriptor) => Array.from(descriptor).join(",
 
 const parseDescriptor = (text) => new Float32Array(String(text).match(/-?\d+(?:\.\d+)?(?:e-?\d+)?/gi).map(Number));
 
+// Distance between two descriptor strings; below about 0.6 is usually the same person.
+export const descriptorDistance = (a, b) => faceapi.euclideanDistance(parseDescriptor(a), parseDescriptor(b));
+
 // Builds a matcher from [{ owner, faceDescriptor }]; labels are the owners' ids.
 export function createMatcher(faces, maxDescriptorDistance = 0.45) {
     const byOwner = new Map();

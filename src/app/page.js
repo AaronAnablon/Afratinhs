@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { TextField } from '@/components/ui/Field';
 import { useToast } from '@/components/ui/Feedback';
-import { DEMO_ACCOUNTS, DEMO_FACE_TTL_HOURS, DEMO_MODE } from '@/globalData/demoAccounts';
+import { DEMO_ACCOUNTS, DEMO_FACE_PHOTOS, DEMO_LIVE_CLASS_MINUTES, DEMO_MODE, DEMO_VISITOR_TTL_HOURS } from '@/globalData/demoAccounts';
 
 const ROLE_ICONS = {
   Admin: HiOutlineShieldCheck,
@@ -61,7 +61,7 @@ export default function Home() {
         router.replace("/AuthenticateAccount")
         return;
       }
-      toast.error(source === "form" ? "Wrong email or password." : "This demo account isn't set up yet. Please try again later.")
+      toast.error(source === "form" ? "Wrong email or password." : "Couldn't open the demo right now. Please try again in a moment.")
     } catch (error) {
       console.error(error)
       toast.error("Something went wrong. Please try again.")
@@ -171,8 +171,10 @@ export default function Home() {
           <section id="demo" className="mx-auto max-w-6xl scroll-mt-16 px-4 py-16 sm:px-6">
             <h2 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">Try it with a demo account</h2>
             <p className="mt-2 max-w-3xl text-slate-600">
-              Log in with one click, or copy the email and password into the form above.
-              Demo accounts only see demo data, which is shared by all visitors and reset every night.
+              Log in with one click, or copy the email and password into the form above. Nothing to set up:
+              the demo comes with sample teachers, three sections of students and a week of classes with attendance.
+              A guide inside the app walks you through it. Each visitor gets their own copy of the data, so nobody
+              else sees your changes, and it&apos;s deleted after {DEMO_VISITOR_TTL_HOURS} hours.
             </p>
             <div className="mt-8 grid gap-5 md:grid-cols-3">
               {DEMO_ACCOUNTS.map((account) => {
@@ -208,12 +210,18 @@ export default function Home() {
                 )
               })}
             </div>
-            <p className="mt-8 max-w-3xl rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-inset ring-amber-200">
-              <span className="font-semibold">Face recognition:</span> the first time you log in
-              with a demo account, you register your face. It stays private to your browser and is deleted after
-              {" "}{DEMO_FACE_TTL_HOURS} hours. Then log in as Teacher, open a class under Schedule, start the camera
-              and it will recognize you as Demo Student.
-            </p>
+            <div className="mt-8 max-w-3xl rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-inset ring-amber-200">
+              <p>
+                <span className="font-semibold">Face recognition:</span> the first time you log in from a browser,
+                with any demo account, you register your face with {DEMO_FACE_PHOTOS} photos from slightly different angles, so
+                the camera checks attendance more accurately. Your face stays private to your browser and is deleted with
+                the rest of your demo after {DEMO_VISITOR_TTL_HOURS} hours.
+              </p>
+              <p className="mt-2">
+                <span className="font-semibold">Your own class:</span> each login starts a {DEMO_LIVE_CLASS_MINUTES}-minute
+                class for Demo Teacher. Log in as Teacher, open it, start the camera and you&apos;re recognized as Demo Student.
+              </p>
+            </div>
           </section>}
       </main>
 
