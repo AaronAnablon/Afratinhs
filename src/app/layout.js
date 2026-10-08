@@ -8,7 +8,7 @@ const inter = Inter({ subsets: ['latin'] })
 
 export const metadata = {
   title: 'AFRATINHS',
-  description: 'Attendance Facial Recognition App For Tinangan Integrated High School',
+  description: 'Attendance Facial Recognition App for Talangan Integrated National High School',
   icons: [{ rel: 'icon', url: Favicon.src }],
 }
 

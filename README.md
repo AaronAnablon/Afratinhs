@@ -1,3 +1,17 @@
+# AFRATINHS
+
+Attendance Facial Recognition App for Talangan Integrated National High School. Admins manage teachers, schedules, sections and students; teachers take attendance by recognizing students' faces through a webcam; students check their attendance and upload excuse letters.
+
+## Demo accounts
+
+The homepage lists demo Admin, Teacher and Student logins that visitors can use with one click.
+
+1. Copy `.env.local.example` to `.env.local` and fill in the database and Cloudinary values. The `NEXT_PUBLIC_DEMO_*` variables hold the demo emails and passwords.
+2. Run `npm run seed:demo` to create the three accounts, a "Demo Section" and a few class schedules. Running it again resets the demo passwords and schedules.
+3. On Vercel, add the same `NEXT_PUBLIC_DEMO_*` variables to the project settings and redeploy.
+
+Anyone using the admin demo can view and change every record, so use a separate database for a public demo.
+
 This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
 ## Getting Started
