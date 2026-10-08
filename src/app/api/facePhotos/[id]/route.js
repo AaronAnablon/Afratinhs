@@ -11,7 +11,7 @@ cloudinary.config({
 
 export const GET = async (request, { params }) => {
     try {
-        const { id } = params;
+        const { id } = await params;
         const post = await prisma.facephotos.findMany({
             where: {
                 owner: id
@@ -30,7 +30,7 @@ export const GET = async (request, { params }) => {
 
 export const PUT = async (request, { params }) => {
     try {
-        const { id } = params
+        const { id } = await params
         const body = await request.json();
         const { editedValues } = body;
         const { owner,
@@ -58,7 +58,7 @@ export const PUT = async (request, { params }) => {
 
 export const DELETE = async (request, { params }) => {
     try {
-        const { id } = params;
+        const { id } = await params;
 
         const deletePhoto = await prisma.facephotos.delete({
             where: {

@@ -4,7 +4,7 @@ import { NextResponse } from "next/server"
 
 export const GET = async (request, { params }) => {
     try {
-        const { id } = params;
+        const { id } = await params;
         const post = await prisma.people.findMany({
             where: {
                 section: id

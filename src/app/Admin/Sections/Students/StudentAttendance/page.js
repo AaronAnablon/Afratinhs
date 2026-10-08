@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
+import { withSuspense } from "@/utils/withSuspense";
 import axios from "axios";
 import { LoadingSpin } from "@/utils/LoadingSpin";
 import { url, headers } from "@/utils/api";
@@ -233,4 +234,4 @@ const Page = () => {
 
 Page.displayName = 'StudentAttendance';
 
-export default Page;
+export default withSuspense(Page);

@@ -11,7 +11,7 @@ cloudinary.config({
 
 export const PUT = async (request, { params }) => {
     try {
-        const { id } = params;
+        const { id } = await params;
         const body = await request.json();
         const { file, studentId } = body;
 

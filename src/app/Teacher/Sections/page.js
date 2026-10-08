@@ -4,6 +4,7 @@ import Layout from "../Layout";
 import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
+import { withSuspense } from "@/utils/withSuspense";
 import axios from "axios";
 import { LoadingSpin } from "@/utils/LoadingSpin";
 import { url, headers } from "@/utils/api";
@@ -79,4 +80,4 @@ const Page = () => {
     );
 }
 
-export default Page;
+export default withSuspense(Page);

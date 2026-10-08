@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react";
+import { withSuspense } from "@/utils/withSuspense";
 import axios from "axios";
 import { useAccount } from "@/app/contextProvider/AccountProvider";
 import { LoadingSpin } from "@/utils/LoadingSpin";
@@ -217,4 +218,4 @@ const Page = () => {
     );
 };
 
-export default Page;
+export default withSuspense(Page);

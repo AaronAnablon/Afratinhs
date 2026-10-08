@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 export const DELETE = async (request, { params }) => {
     try {
-        const { section } = params
+        const { section } = await params
         await prisma.attendance.deleteMany({
             where: {
                 section

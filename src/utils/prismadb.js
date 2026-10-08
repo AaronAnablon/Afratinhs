@@ -1,8 +1,9 @@
 
 import {PrismaClient} from '@prisma/client';
 
-global.prisma = global.prisma || new PrismaClient();
+const prisma = global.prisma || new PrismaClient();
 
-if (process.env.NODE_ENV !== "production") global.prisma = global.prisma;
+// Reuse one client across hot reloads in development.
+if (process.env.NODE_ENV !== "production") global.prisma = prisma;
 
-module.exports = global.prisma;
+export default prisma;

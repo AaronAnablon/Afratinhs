@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 export const GET = async (req, { params }) => {
     try {
-        const email = params
+        const email = await params
         const post = await prisma.people.findMany({
             where: {
                 email: email.id,

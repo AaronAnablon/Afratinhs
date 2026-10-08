@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useEffect, useState } from "react";
+import { withSuspense } from "@/utils/withSuspense";
 import axios from "axios";
 import { url, headers } from "@/utils/api";
 import {
@@ -257,4 +258,4 @@ const AddFacePhoto = ({ }) => {
 AddFacePhoto.displayName = 'AddFacePhoto';
 
 
-export default AddFacePhoto;
+export default withSuspense(AddFacePhoto);

@@ -4,7 +4,7 @@ import bcrypt from 'bcrypt';
 
 export const GET = async (request, { params }) => {
     try {
-        const { id } = params;
+        const { id } = await params;
         const post = await prisma.people.findUnique({
             where: {
                 id
@@ -23,7 +23,7 @@ export const GET = async (request, { params }) => {
 
 export const PUT = async (request, { params }) => {
     try {
-        const { id } = params
+        const { id } = await params
         const body = await request.json();
         const { data } = body;
         const { firstName,
@@ -70,7 +70,7 @@ export const PUT = async (request, { params }) => {
 
 export const DELETE = async (request, { params }) => {
     try {
-        const { id } = params;
+        const { id } = await params;
 
         await prisma.people.delete({
             where: {

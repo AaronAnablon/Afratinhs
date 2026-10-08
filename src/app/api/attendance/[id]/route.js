@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 export const GET = async (request, { params }) => {
     try {
-        const { id } = params;
+        const { id } = await params;
         const post = await prisma.attendance.findMany({
             where: {
                 teacher: id
@@ -24,7 +24,7 @@ export const revalidate = 0;
 
 export const PUT = async (request, { params }) => {
     try {
-        const { id } = params
+        const { id } = await params
         const body = await request.json();
         const { data } = body;
         const { isOn, date, time, teacher, event, section } = data;
@@ -51,7 +51,7 @@ export const PUT = async (request, { params }) => {
 
 export const DELETE = async (request, { params }) => {
     try {
-        const { id } = params;
+        const { id } = await params;
 
         await prisma.attendance.delete({
             where: {

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 export const GET = async (request, { params }) => {
     try {
-        const { id } = params;
+        const { id } = await params;
         const findJson = await prisma.attendance.findUnique({
             where: {
                 id: id
@@ -23,7 +23,7 @@ export const revalidate = 0;
 
 export const DELETE = async (request, { params }) => {
     try {
-        const { id } = params;
+        const { id } = await params;
 
         await prisma.attendance.deleteMany({
             where: {
