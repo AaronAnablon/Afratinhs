@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { randomUUID } from "crypto";
 import prisma from "@/utils/prismadb";
 import accounts from "@/globalData/demoAccounts/accounts.json";
-import { DEMO_FACE_TTL_HOURS, DEMO_MODE, isDemoEmail } from "@/globalData/demoAccounts";
+import { DEMO_FACE_TTL_HOURS, DEMO_MODE } from "@/globalData/demoAccounts";
 
 // Each demo visitor's browser gets a random ID so their face is kept apart
 // from other visitors. Server-side only.
@@ -41,9 +41,3 @@ export const getActiveDemoFaces = (visitorId) =>
 
 export const getDemoStudent = () =>
     DEMO_MODE ? prisma.people.findFirst({ where: { email: accounts.student.email } }) : null;
-
-export const isDemoPersonId = async (id) => {
-    if (!DEMO_MODE) return false;
-    const person = await prisma.people.findUnique({ where: { id }, select: { email: true } });
-    return isDemoEmail(person?.email);
-};

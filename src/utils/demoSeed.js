@@ -21,6 +21,8 @@ const formatDate = (daysFromToday) => {
 };
 
 const resetDemoData = async (prisma) => {
+    const demoEmails = Object.values(accounts).map((account) => account.email);
+
     // People.email is not unique in the schema, so look it up first to avoid duplicates.
     const upsertPerson = async ({ email, password, ...data }) => {
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -28,13 +30,17 @@ const resetDemoData = async (prisma) => {
         if (existing) {
             return prisma.people.update({
                 where: { id: existing.id },
-                data: { ...data, password: hashedPassword },
+                data: { ...data, password: hashedPassword, isDemo: true },
             });
         }
         return prisma.people.create({
-            data: { ...data, email, password: hashedPassword },
+            data: { ...data, email, password: hashedPassword, isDemo: true },
         });
     };
+
+    // Remove everything demo visitors created, keeping only the demo accounts.
+    await prisma.facephotos.deleteMany({ where: { isDemo: true } });
+    await prisma.people.deleteMany({ where: { isDemo: true, email: { notIn: demoEmails } } });
 
     const generateUniqueCode = async () => {
         let code;
@@ -69,8 +75,9 @@ const resetDemoData = async (prisma) => {
         role: 2,
     });
 
-    // Rebuild the demo schedule from scratch so it is fresh after each run.
-    await prisma.attendance.deleteMany({ where: { section: DEMO_SECTION } });
+    // Rebuild the demo classes from scratch. Older demo classes may not have
+    // the isDemo flag yet, so also match the demo teacher's classes.
+    await prisma.attendance.deleteMany({ where: { OR: [{ isDemo: true }, { teacher: teacher.id }] } });
 
     const schedules = [
         { daysFromToday: -1, event: "Mathematics", present: true },
@@ -88,6 +95,7 @@ const resetDemoData = async (prisma) => {
                 event: schedule.event,
                 code: await generateUniqueCode(),
                 section: DEMO_SECTION,
+                isDemo: true,
                 students: [{
                     id: student.id,
                     status: "absent",

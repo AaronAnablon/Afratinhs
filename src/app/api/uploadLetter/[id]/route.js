@@ -1,6 +1,7 @@
 import prisma from "@/utils/prismadb";
 import { v2 as cloudinary } from 'cloudinary';
 import { NextResponse } from "next/server";
+import { ADMIN, ApiError, STUDENT, findAttendanceFor, forViewer, readJson, withAuth } from "@/utils/apiAuth";
 
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -9,50 +10,31 @@ cloudinary.config({
     secure: true
 });
 
-export const PUT = async (request, { params }) => {
-    try {
-        const { id } = await params;
-        const body = await request.json();
-        const { file, studentId } = body;
+// Uploads an excuse letter for a student's absence. Students can only
+// upload their own; admins can upload for anyone in the class.
+export const PUT = withAuth([ADMIN, STUDENT], async (request, { params }, user) => {
+    const { id } = await params;
+    const record = await findAttendanceFor(user, id);
+    const { file, studentId } = await readJson(request);
 
-        // if (letterPublicId) {
-        //     await cloudinary.uploader.destroy(letterPublicId, { invalidate: true });
-        // }
-
-        const uploadResponse = await cloudinary.uploader.upload(file, {
-            upload_preset: "Afratinhs",
-            folder: 'Letters'
-        });
-
-        if (uploadResponse) {
-            const findJson = await prisma.attendance.findUnique({
-                where: {
-                    id
-                }
-            });
-
-            const updatedRecord = await prisma.attendance.update({
-                where: {
-                    id: findJson.id
-                },
-                data: {
-                    students: findJson.students.map((student) => {
-                        if (student.id === studentId) {
-                            return {
-                                ...student,
-                                letterUrl: uploadResponse.secure_url,
-                                letterPublicId: uploadResponse.public_id
-                            };
-                        }
-                        return student;
-                    }),
-                },
-            });
-            return NextResponse.json(updatedRecord);
-        }
-
-    } catch (err) {
-        console.error(err);
-        return NextResponse.json({ message: "Update error" }, { status: 500 });
+    if (user.role === STUDENT && studentId !== user.id) throw new ApiError(403, "You can only upload your own letter.");
+    if (!(record.students || []).some((student) => student.id === studentId)) {
+        throw new ApiError(404, "That student isn't in this class.");
     }
-};
+    if (typeof file !== "string" || !file.startsWith("data:image/")) throw new ApiError(400, "Please choose an image.");
+
+    const uploadResponse = await cloudinary.uploader.upload(file, {
+        upload_preset: "Afratinhs",
+        folder: 'Letters'
+    });
+
+    const updatedRecord = await prisma.attendance.update({
+        where: { id: record.id },
+        data: {
+            students: record.students.map((student) => student.id === studentId
+                ? { ...student, letterUrl: uploadResponse.secure_url, letterPublicId: uploadResponse.public_id }
+                : student),
+        },
+    });
+    return NextResponse.json(forViewer(user, updatedRecord));
+});

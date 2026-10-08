@@ -1,21 +1,19 @@
 import prisma from "@/utils/prismadb"
 import { NextResponse } from "next/server"
+import { ADMIN, ApiError, STUDENT, TEACHER, scopeOf, withAuth, withoutPassword } from "@/utils/apiAuth"
 
-
-export const GET = async (request, { params }) => {
-    try {
-        const { id } = await params;
-        const post = await prisma.people.findMany({
-            where: {
-                section: id
-            }
+// Students of a section. Teachers can only list sections they teach.
+export const GET = withAuth([ADMIN, TEACHER], async (request, { params }, user) => {
+    const { id: section } = await params;
+    if (user.role === TEACHER) {
+        const teaches = await prisma.attendance.findFirst({
+            where: { section, teacher: user.id, ...scopeOf(user) },
+            select: { id: true },
         });
-        return NextResponse.json(post);
-    } catch (err) {
-        console.log(err)
-        return NextResponse.json(
-            { message: "GET Error" },
-            { status: 500 }
-        );
+        if (!teaches) throw new ApiError(403, "You don't teach this section.");
     }
-};
+    const post = await prisma.people.findMany({ where: { section, role: STUDENT, ...scopeOf(user) } });
+    return NextResponse.json(post.map(withoutPassword));
+});
+
+export const revalidate = 0;

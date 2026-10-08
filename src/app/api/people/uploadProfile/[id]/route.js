@@ -1,7 +1,8 @@
 import prisma from "@/utils/prismadb";
 import { v2 as cloudinary } from 'cloudinary';
 import { NextResponse } from "next/server";
-import { isDemoPersonId } from "@/utils/demoVisitor";
+import { ADMIN, ApiError, findPersonFor, readJson, withAuth, withoutPassword } from "@/utils/apiAuth";
+import { isDemoEmail } from "@/globalData/demoAccounts";
 
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -10,49 +11,29 @@ cloudinary.config({
     secure: true
 });
 
-export const PUT = async (request, { params }) => {
-    try {
-        const { id } = await params;
-        if (await isDemoPersonId(id)) {
-            return NextResponse.json({ message: "Demo accounts can't change their profile photo." }, { status: 403 });
-        }
-        const body = await request.json();
-        const { file, account } = body;
-        const { profile, profilePublicId } = account
+// Changes a profile photo. Anyone can change their own; admins can change anyone's.
+export const PUT = withAuth(null, async (request, { params }, user) => {
+    const { id } = await params;
+    if (id !== user.id && user.role !== ADMIN) throw new ApiError(403, "You can only change your own photo.");
+    const person = await findPersonFor(user, id);
+    if (isDemoEmail(person.email)) throw new ApiError(403, "Demo accounts can't change their profile photo.");
 
-        if (profilePublicId && profile) {
-            if (profilePublicId) {
-                await cloudinary.uploader.destroy(profilePublicId, { invalidate: true });
-            }
-            const cloudinaryUploadResponse = await cloudinary.uploader.upload(file, {
-                upload_preset: "Afratinhs",
-                folder: 'Profile'
-            });
+    const { file } = await readJson(request);
+    if (typeof file !== "string" || !file.startsWith("data:image/")) throw new ApiError(400, "Please choose an image.");
 
-            const updatePost = await prisma.people.update({
-                where: { id },
-                data: {
-                    profilePublicId: cloudinaryUploadResponse.public_id,
-                    profile: cloudinaryUploadResponse.url,
-                }
-            });
-            return NextResponse.json(updatePost);
-        } else {
-            const cloudinaryUploadResponse = await cloudinary.uploader.upload(file, {
-                upload_preset: "Afratinhs",
-                folder: 'Profile'
-            });
-            const updatePost = await prisma.people.update({
-                where: { id },
-                data: {
-                    profilePublicId: cloudinaryUploadResponse.public_id,
-                    profile: cloudinaryUploadResponse.url,
-                }
-            });
-            return NextResponse.json(updatePost);
-        }
-    } catch (err) {
-        console.error(err);
-        return NextResponse.json({ message: "Update Error", error: err }, { status: 500 });
+    if (person.profilePublicId) {
+        await cloudinary.uploader.destroy(person.profilePublicId, { invalidate: true });
     }
-};
+    const cloudinaryUploadResponse = await cloudinary.uploader.upload(file, {
+        upload_preset: "Afratinhs",
+        folder: 'Profile'
+    });
+    const updatePost = await prisma.people.update({
+        where: { id: person.id },
+        data: {
+            profilePublicId: cloudinaryUploadResponse.public_id,
+            profile: cloudinaryUploadResponse.secure_url,
+        }
+    });
+    return NextResponse.json(withoutPassword(updatePost));
+});

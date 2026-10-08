@@ -1,38 +1,10 @@
-import prisma from "@/utils/prismadb"
 import { NextResponse } from "next/server";
+import { ADMIN, STUDENT, TEACHER, findAttendanceFor, forViewer, withAuth } from "@/utils/apiAuth";
 
-export const GET = async (request, { params }) => {
-    try {
-        const { id } = await params;
-        const findJson = await prisma.attendance.findUnique({
-            where: {
-                id: id
-            }
-        });
-
-        return NextResponse.json(findJson);
-
-    } catch (err) {
-        console.error(err);
-        return NextResponse.json({ message: "Update Error", error: err.message }, { status: 500 });
-    }
-}
+export const GET = withAuth([ADMIN, TEACHER, STUDENT], async (request, { params }, user) => {
+    const { id } = await params;
+    const record = await findAttendanceFor(user, id);
+    return NextResponse.json(forViewer(user, record));
+});
 
 export const revalidate = 0;
-
-
-export const DELETE = async (request, { params }) => {
-    try {
-        const { id } = await params;
-
-        await prisma.attendance.deleteMany({
-            where: {
-                teacher: id
-            }
-        });
-
-        return NextResponse.json("Post has been deleted");
-    } catch (err) {
-        return NextResponse.json({ message: "DELETE Error", err }, { status: 500 });
-    }
-};

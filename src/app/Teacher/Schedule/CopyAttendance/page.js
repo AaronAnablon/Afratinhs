@@ -1,214 +1,104 @@
 "use client"
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { HiOutlineCamera, HiOutlineDocumentDuplicate } from "react-icons/hi2";
+import { AttendanceSheet } from "@/components/AttendanceSheet";
+import { Button, ButtonLink } from "@/components/ui/Button";
+import { Card, CardHeader } from "@/components/ui/Card";
+import { ErrorState } from "@/components/ui/EmptyState";
+import { useConfirm, useToast } from "@/components/ui/Feedback";
+import { inputClass } from "@/components/ui/Field";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { PageLoader } from "@/components/ui/Spinner";
+import { api, errorMessage, useFetch } from "@/utils/http";
+import { displayTime, parseClassDate, relativeDayLabel } from "@/utils/schedule";
 import { withSuspense } from "@/utils/withSuspense";
-import axios from "axios";
-import { LoadingSpin } from "@/utils/LoadingSpin";
-import { url, headers } from "@/utils/api";
-import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { FaCheck, FaPlus } from "react-icons/fa";
-import { IoClose } from "react-icons/io5";
-import { MdOutlineMailOutline } from "react-icons/md";
-import useConfirmation from "@/utils/ConfirmationHook";
-import Modal from "@/utils/Modal";
-import { IoMdCloseCircle } from "react-icons/io";
-import { FcDataProtection } from "react-icons/fc";
-import { SlEnvolopeLetter } from "react-icons/sl";
-import useMessageHook from "@/utils/MessageHook";
 
+// The attendance sheet of one class: review, correct, or copy from another class.
+const AttendanceSheetPage = () => {
+    const toast = useToast();
+    const confirm = useConfirm();
+    const attendanceId = useSearchParams().get("AttendanceId");
+    const record = useFetch(attendanceId ? `/api/attendance/getAttendanceById/${attendanceId}` : null);
+    const section = record.data?.section;
+    const students = useFetch(section ? `/api/people/getStudents/${encodeURIComponent(section)}` : null);
+    const [code, setCode] = useState("");
+    const [copying, setCopying] = useState(false);
 
-const Page = () => {
-    const { showConfirmation, ConfirmationDialog } = useConfirmation();
-    const { showMessage, Message } = useMessageHook();
-    const [section, setSection] = useState();
-    const [studentProfile, setStudentProfile] = useState();
-    const [loading, setLoading] = useState(false);
-    const currentPathname = usePathname();
-    const [active, setActive] = useState();
-    const [viewLetter, setViewLetter] = useState();
-    const [idToCopy, setIdToCopy] = useState();
+    if (record.error || students.error) return <ErrorState message={record.error || students.error} onRetry={() => { record.reload(); students.reload(); }} />;
+    if (record.loading || students.loading) return <PageLoader />;
 
-    const searchParams = useSearchParams();
-    const attendanceId = searchParams.get("AttendanceId");
+    const date = parseClassDate(record.data.date);
 
-    useEffect(() => {
-        setActive(currentPathname);
-    }, [currentPathname]);
-
-    const router = useRouter();
-
-    const goBack = () => {
-        router.back();
-    };
-
-    const handleGetStudents = async (sectionName) => {
-        try {
-            const response = await axios.get(`${url}/api/people/getStudents/${sectionName}`, headers);
-            setStudentProfile(response.data)
-        } catch (err) {
-            showMessage("Something went wrong!")
-            console.log(err);
-        }
-    }
-
-    const handleGetData = async () => {
-        setLoading(true);
-        try {
-            const response = await axios.get(`${url}/api/attendance/getAttendanceById/${attendanceId}`, { headers });
-            setSection(response.data);
-            setLoading(false);
-        } catch (err) {
-            setLoading(false);
-            showMessage("Something went wrong!");
-            console.log(err);
-        }
-    };
-
-    useEffect(() => {
-        if (section) {
-            handleGetStudents(section.section);
-        }
-    }, [section]);
-
-
-    useEffect(() => {
-        handleGetData();
-    }, []);
-
-
-    const handleChangeStatus = (id, studentId, statusIn, statusOut,) => {
-        showConfirmation(<div className='grid justify-center gap-4'>
-            <div className='bg-green-700 flex items-center text-white gap-4 rounded-t-lg w-full'><FcDataProtection size={32} />Edit Attendance</div>
-            <p className='text-xl p-6'>Are you sure you want to change the status?</p>
-        </div>, () => {
-            handleChangeStatusApi(id, studentId, statusIn, statusOut,)
+    const copy = async (event) => {
+        event.preventDefault();
+        const ok = await confirm({
+            title: `Copy attendance from class ${code}?`,
+            message: "Every student's IN and OUT status on this sheet is replaced with the one from that class.",
+            confirmLabel: "Copy attendance",
         });
-    };
-
-    const handleChangeStatusApi = async (id, filteredStudent, statusIn, statusOut,) => {
-        setLoading(true)
-        const letterUrl = filteredStudent.letterUrl
-        const letterPublicId = filteredStudent.letterPublicId
-        const studentId = filteredStudent.id
+        if (!ok) return;
+        setCopying(true);
         try {
-            await axios.put(`${url}/api/attendance/updateStatusOfStudent/${id}`,
-                { studentId, statusIn, statusOut, letterUrl, letterPublicId }, headers);
-            setLoading(false)
-            showMessage(`Successfully updated the status!`)
-            handleGetData();
+            const { data } = await api.put(`/api/attendance/copyAttendance/${attendanceId}`, { code });
+            record.mutate(data);
+            setCode("");
+            toast.success("Attendance copied.");
         } catch (error) {
-            setLoading(false)
-            console.error('An error occurred:', error);
-            showMessage("Something went wrong while updating")
+            toast.error(errorMessage(error));
         }
-    };
-
-
-
-    const handleCopyAttendance = (e) => {
-        e.preventDefault()
-        showConfirmation(
-            <div className='grid justify-center gap-4'>
-                <div className='bg-green-700 flex items-center text-white gap-4 rounded-t-lg w-full'><FcDataProtection size={32} />Edit Attendance</div>
-                <p className='text-xl p-6'>Are you sure you want to copy the attendance from the the code entered?</p>
-            </div>, () => {
-                handleCopyAttendanceApi()
-            });
-    };
-
-    const handleCopyAttendanceApi = async () => {
-        setLoading(true)
-        try {
-            await axios.put(`${url}/api/attendance/copyAttendance/${attendanceId}`,
-                { code: idToCopy, section: section?.section }, headers);
-            setLoading(false)
-            showMessage(`Successfully copied the attendance!`)
-            handleGetData();
-        } catch (error) {
-            setLoading(false)
-            console.error('An error occurred:', error);
-            showMessage(error.response.data.message)
-        }
+        setCopying(false);
     };
 
     return (
         <>
-            <ConfirmationDialog />
-            <Message />
-            {loading && <Modal>
-                <LoadingSpin loading={loading} />
-            </Modal>}
-            <div className="border-b-2 px-4 py-4 flex flex-wrap gap-2 w-full border-green-700">
-                <p>{section?.date} {section?.time}</p>
-                <p>&#40;{section?.section}&#41;</p>
-                <p>{section?.event}</p>
-                {section && <form className="flex gap-1 items-center" onSubmit={handleCopyAttendance}>
-                    <input
-                        value={idToCopy}
-                        onChange={(e) => setIdToCopy(e.target.value)}
-                        placeholder="Enter code"
-                        className="border-2 rounded-lg pl-1 border-gray-400" />
-                    <button type="submit" className="bg-green-700 rounded-lg px-4 text-white">Copy</button>
-                </form>}
-            </div>
-            <div className="w-full grid gap-1 bg-green-700 py-4 mt-6 mb-20">
-                <div className="flex mx-4 font-semibold text-white justify-between">
-                    <p className="ml-10">Name</p>
-                    <div className="flex gap-2 items-center mr-6">
-                        <p>IN</p>
-                        <p>OUT</p>
-                        <p><SlEnvolopeLetter /></p>
-                    </div>
-                </div>
-                {section?.students.map((student, index) => (
-                    <div key={index} className="flex mx-4 rounded-lg text-white hover:bg-green-500 px-6 justify-between">
-                        {studentProfile && (studentProfile?.filter((studentes) => studentes.id === student.id)).map((stud, studentIndex) => (
-                            <p key={studentIndex}>{stud.firstName} {stud.lastName}</p>
-                        ))}
-                        <div className="flex gap-2 items-center">
-                            {student.statusIn === "present" ?
-                                <button onClick={() => handleChangeStatus(attendanceId, student, "absent", student.statusOut)} className="bg-white rounded-full text-green-700 p-1">
-                                    <FaCheck size={14} /></button> :
-                                <button onClick={() => handleChangeStatus(attendanceId, student, "present", student.statusOut)} className="bg-white rounded-full text-red-700 p-1">
-                                    <IoClose size={16} /></button>}
-                            {student.statusOut === "present" ?
-                                <button onClick={() => handleChangeStatus(attendanceId, student, student.statusIn, "absent")} className="bg-white rounded-full text-green-700 p-1">
-                                    <FaCheck size={14} /></button> :
-                                <button onClick={() => handleChangeStatus(attendanceId, student, student.statusIn, "present")} className="bg-white rounded-full text-red-700 p-1">
-                                    <IoClose size={16} /></button>}
-                            {student.letterUrl ? (
-                                <button onClick={() => setViewLetter(student.letterUrl)} className="bg-white rounded-full text-blue-700 p-1">
-                                    <MdOutlineMailOutline size={14} />
-                                </button>
-                            ) : (
-                                <div className="bg-white rounded-full text-green-700 p-1">
-                                    <FaPlus size={14} />
-                                </div>
-                            )}
-                        </div>
-                        {viewLetter && (
-                            <Modal>
-                                <div className="relative w-full h-full">
-                                    <button className="absolute rounded-full bg-white text-red-700 -top-2 -right-2" onClick={() => setViewLetter("")}>
-                                        <IoMdCloseCircle size={28} style={{ color: 'red' }} />
-                                    </button>
-                                    <a href={viewLetter} target="_blank">
-                                        <img src={viewLetter} height={400} width={400} alt="letter" />
-                                    </a>
-                                </div>
-                            </Modal>
-                        )}
-                    </div>
-                ))
-                }
-            </div>
-            <div className={`fixed bottom-2 flex w-full justify-center`}>
-                <div className={`flex justify-between mx-4 ${active === "/Admin" ? "grid gap-2 w-full" : "w-full md:w-1/4"}`}>
-                    <button onClick={goBack} className="bg-green-700 text-white px-4 rounded-full">Back</button>
+            <PageHeader
+                back={{ href: "/Teacher/Schedule", label: "Schedule" }}
+                title={`${record.data.event} · ${record.data.section}`}
+                description={`${date ? relativeDayLabel(date) : record.data.date} · ${displayTime(record.data.time)}`}
+                actions={(
+                    <ButtonLink icon={HiOutlineCamera} href={`/Teacher/Schedule/RecordAttendance?AttendanceId=${attendanceId}`}>
+                        Take attendance
+                    </ButtonLink>
+                )}
+            />
+
+            <div className="grid gap-6 lg:grid-cols-3">
+                <Card className="lg:col-span-2">
+                    <CardHeader title="Attendance sheet" description="Click a status to switch it between present and absent." />
+                    <AttendanceSheet record={record.data} profiles={students.data} editable onChange={record.mutate} />
+                </Card>
+
+                <div className="space-y-6">
+                    <Card className="p-5">
+                        <h2 className="text-base font-semibold text-slate-900">Copy from another class</h2>
+                        <p className="mt-1 text-sm text-slate-500">
+                            Already took attendance in another {record.data.section} class today? Enter its code to copy it here.
+                        </p>
+                        <form onSubmit={copy} className="mt-4 flex gap-2">
+                            <input
+                                value={code}
+                                onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 5))}
+                                inputMode="numeric"
+                                placeholder="5-digit code"
+                                aria-label="Class code"
+                                className={`${inputClass} tabular-nums`}
+                                required
+                                minLength={5}
+                            />
+                            <Button type="submit" variant="secondary" icon={HiOutlineDocumentDuplicate} loading={copying} disabled={code.length !== 5}>Copy</Button>
+                        </form>
+                    </Card>
+                    <Card className="p-5">
+                        <h2 className="text-base font-semibold text-slate-900">This class&apos;s code</h2>
+                        <p className="mt-1 text-sm text-slate-500">Share it so other classes in this section can copy this attendance.</p>
+                        <p className="mt-3 inline-block rounded-lg bg-brand-50 px-3 py-1.5 font-mono text-2xl font-semibold tracking-[0.25em] text-brand-800 ring-1 ring-inset ring-brand-600/20">{record.data.code}</p>
+                    </Card>
                 </div>
             </div>
         </>
     );
 };
 
-export default withSuspense(Page);
+export default withSuspense(AttendanceSheetPage);

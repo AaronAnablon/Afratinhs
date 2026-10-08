@@ -3,12 +3,13 @@
 import { useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import axios from 'axios';
-import { url } from '@/utils/api';
-import { LoadingSpin } from '@/utils/LoadingSpin';
-import Modal from '@/utils/Modal';
+import { PageLoader } from '@/components/ui/Spinner';
 import { isDemoEmail } from '@/globalData/demoAccounts';
+import { ROLE_HOME } from '@/globalData/roles';
+import { api } from '@/utils/http';
 
+// Sends a freshly logged-in user to their role's home page. Demo visitors
+// register their own face first.
 const Page = () => {
     const { data: session, status } = useSession();
     const router = useRouter()
@@ -16,38 +17,22 @@ const Page = () => {
     useEffect(() => {
         if (status === "loading") return;
         if (!session) {
-            router.push(`${url}`)
+            router.replace("/")
             return;
         }
 
-        const goToRolePage = () => {
-            if (session.role === 0) {
-                router.push(`${url}/Admin`)
-            } else if (session.role === 1) {
-                router.push(`${url}/Teacher`)
-            } else if (session.role === 2) {
-                router.push(`${url}/Student`)
-            }
-        }
-
+        const goToRolePage = () => router.replace(ROLE_HOME[session.role] ?? "/")
         if (!isDemoEmail(session.email)) {
             goToRolePage()
             return;
         }
 
-        // Demo visitors register their own face before trying the app.
-        axios.get("/api/demoFace")
-            .then((response) => response.data.registered ? goToRolePage() : router.push("/DemoFace"))
+        api.get("/api/demoFace")
+            .then((response) => response.data.registered ? goToRolePage() : router.replace("/DemoFace"))
             .catch(goToRolePage)
     }, [session, status, router])
 
-    return (
-        <div className="w-screen h-screen grid items-center justify-center">
-            <Modal>
-                <LoadingSpin loading={true} />
-            </Modal>
-        </div>
-    );
+    return <PageLoader label="Signing you in..." />;
 }
 
 export default Page;

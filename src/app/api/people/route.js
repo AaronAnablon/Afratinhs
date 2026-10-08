@@ -1,47 +1,36 @@
 import prisma from "@/utils/prismadb"
 import { NextResponse } from "next/server"
 import bcrypt from 'bcrypt';
+import {
+    ADMIN, ApiError, TEACHER, assertEmailAvailable, demoStamp, readJson,
+    requireFields, scopeOf, withAuth, withoutPassword,
+} from "@/utils/apiAuth"
 
-export const POST = async (request) => {
-    try {
-        const body = await request.json();
-        const { firstName, lastName, email, password, role } = body;
+// Creates a teacher or admin account. Students are created through addStudent.
+export const POST = withAuth([ADMIN], async (request, context, user) => {
+    const body = await readJson(request);
+    requireFields(body, ["firstName", "lastName", "email", "password"]);
+    const role = Number(body.role ?? TEACHER);
+    if (![ADMIN, TEACHER].includes(role)) throw new ApiError(400, "Invalid role.");
 
-        const saltRounds = 10
+    const email = body.email.trim().toLowerCase();
+    await assertEmailAvailable(email);
+    const newPost = await prisma.people.create({
+        data: {
+            firstName: body.firstName.trim(),
+            lastName: body.lastName.trim(),
+            email,
+            password: await bcrypt.hash(body.password, 10),
+            role,
+            ...demoStamp(user),
+        },
+    })
+    return NextResponse.json({ message: "Registered", newPost: withoutPassword(newPost) })
+});
 
-        const hashedPassword = await bcrypt.hash(password, saltRounds);
-        const newPost = await prisma.people.create({
-            data: {
-                firstName,
-                lastName,
-                email,
-                password: hashedPassword,
-                role,
-            },
-        })
-        return NextResponse.json({ message: "Registered", newPost })
+export const GET = withAuth([ADMIN], async (request, context, user) => {
+    const posts = await prisma.people.findMany({ where: scopeOf(user) })
+    return NextResponse.json(posts.map(withoutPassword));
+});
 
-
-    } catch (error) {
-        console.error(error);
-        return NextResponse.json({ message: "POST Error", error }, { status: 500 });
-    }
-};
-
-
-
-
-export const GET = async () => {
-    try {
-        const posts = await prisma.people.findMany({
-        })
-        return NextResponse.json(posts, {
-            headers: {
-                "revalidate": "0"
-            }
-        });
-    } catch (err) {
-        console.log(err)
-        return NextResponse.json({ message: "GET Error", err }, { status: 500 })
-    }
-}
+export const revalidate = 0;

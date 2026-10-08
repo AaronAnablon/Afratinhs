@@ -1,279 +1,106 @@
 "use client"
 
-import React, { useEffect, useState } from "react";
-import { withSuspense } from "@/utils/withSuspense";
-import axios from "axios";
-import { url, headers } from "@/utils/api";
-import {
-  isFaceDetectionModelLoaded,
-  isFacialLandmarkDetectionModelLoaded,
-  isFeatureExtractionModelLoaded,
-  loadModels,
-} from "@/app/faceUtil";
-import { DEFAULT_UPLOAD_OPTION, UPLOAD_OPTION } from "@/globalData";
-import { useSearchParams } from "next/navigation";
-import ModelLoadStatus from "@/utils/ModelLoadStatus";
-import ModelLoading from "@/utils/ModelLoading";
-import { UploadFromDisk } from "@/components/Student/UploadFromDisk";
-import { UploadFromWebcam } from "@/components/Student/UploadFromWebCam";
+import { useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
-import useMessageHook from "@/utils/MessageHook";
+import { useSearchParams } from "next/navigation";
+import { HiOutlineFaceSmile, HiOutlineTrash } from "react-icons/hi2";
+import { FaceCapture } from "@/components/face/FaceCapture";
+import { fullName } from "@/components/ui/Avatar";
+import { ButtonLink, IconButton } from "@/components/ui/Button";
+import { Card, CardHeader } from "@/components/ui/Card";
+import { EmptyState, ErrorState } from "@/components/ui/EmptyState";
+import { useConfirm, useToast } from "@/components/ui/Feedback";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { PageLoader } from "@/components/ui/Spinner";
 import { isDemoEmail } from "@/globalData/demoAccounts";
+import { api, errorMessage, useFetch } from "@/utils/http";
+import { withSuspense } from "@/utils/withSuspense";
 
+const FacePhotosPage = () => {
+    const toast = useToast();
+    const confirm = useConfirm();
+    const studentId = useSearchParams().get("id");
+    const student = useFetch(studentId ? `/api/people/${studentId}` : null);
+    const isDemoStudent = isDemoEmail(student.data?.email);
+    const photos = useFetch(student.data && !isDemoStudent ? `/api/facePhotos/${studentId}` : null);
+    const [saving, setSaving] = useState(false);
 
-const AddFacePhoto = ({ }) => {
-  const [selectedUploadOption, setSelectedUploadOption] = useState(DEFAULT_UPLOAD_OPTION);
-  const [isAllModelLoaded, setIsAllModelLoaded] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [deletingIndex, setDeletingIndex] = useState(false);
-  const [loadingMessageError, setLoadingMessageError] = useState("");
-  const [facePhoto, setFacePhoto] = useState()
-  const [faceDesc, setFaceDesc] = useState()
-  const [savedImages, setSavedImages] = useState()
-  const [profile, setProfile] = useState()
-  const searchParams = useSearchParams()
-  const currentPathname = usePathname()
-  const [active, setActive] = useState()
-  const { showMessage, Message } = useMessageHook();
+    if (student.error) return <ErrorState message={student.error} onRetry={student.reload} />;
+    if (student.loading) return <PageLoader />;
 
-  useEffect(() => {
-    setActive(currentPathname)
-  }, [currentPathname])
+    const back = { href: `/Admin/Sections/Students/StudentAttendance?id=${studentId}`, label: fullName(student.data) };
 
-  const router = useRouter();
-  const goBack = () => {
-    router.back();
-  };
-
-  const studentId = searchParams.get('id')
-
-  const handleSelectUploadOption = (value) => {
-    setSelectedUploadOption(value);
-  };
-
-  useEffect(() => {
-    async function loadingtheModel() {
-      await loadModels(setLoadingMessage, setLoadingMessageError);
-      setIsAllModelLoaded(true);
-    }
-    if (
-      !!isFaceDetectionModelLoaded() &&
-      !!isFacialLandmarkDetectionModelLoaded() &&
-      !!isFeatureExtractionModelLoaded()
-    ) {
-      setIsAllModelLoaded(true);
-      return;
+    // Demo visitors each register their own face, so the shared uploader is hidden.
+    if (isDemoStudent) {
+        return (
+            <>
+                <PageHeader back={back} title="Face photos" description={fullName(student.data)} />
+                <EmptyState
+                    icon={HiOutlineFaceSmile}
+                    title="Demo visitors use their own face"
+                    description="Each visitor registers their own face for Demo Student, so no two visitors share one."
+                    action={<ButtonLink href="/DemoFace">Register your face</ButtonLink>}
+                />
+            </>
+        );
     }
 
-    loadingtheModel();
-  }, [isAllModelLoaded]);
+    const save = async (photo, descriptor) => {
+        setSaving(true);
+        try {
+            await api.post("/api/facePhotos", { owner: studentId, facePhoto: photo, faceDescriptor: descriptor });
+            toast.success("Face photo saved.");
+            photos.reload();
+        } catch (error) {
+            toast.error(errorMessage(error));
+        }
+        setSaving(false);
+    };
 
-  const handleGetData = async () => {
-    try {
-      const response = await axios.get(`${url}/api/people/${studentId}`, { headers });
-      setProfile(response.data)
-    } catch (err) {
-      showMessage("Something went wrong!")
-      console.log(err);
-    }
-  }
+    const remove = async (photo) => {
+        const ok = await confirm({ title: "Delete this face photo?", message: "The camera will no longer use it to recognize this student.", confirmLabel: "Delete photo", tone: "danger" });
+        if (!ok) return;
+        try {
+            await api.put(`/api/facePhotos/deleteFacePhoto/${photo.id}`);
+            toast.success("Face photo deleted.");
+            photos.reload();
+        } catch (error) {
+            toast.error(errorMessage(error));
+        }
+    };
 
-  const handleGetStudentFacePhotos = async () => {
-    try {
-      const response = await axios.get(`${url}/api/facePhotos/${studentId}`, { headers });
-      setSavedImages(response.data)
-    } catch (err) {
-      showMessage("Something went wrong!")
-      console.log(err);
-    }
-  }
-
-  const handleDeleteStudentFacePhotos = async (photo, index) => {
-    setDeleting(!deleting)
-    setDeletingIndex(index)
-    try {
-      const response = await axios.put(`${url}/api/facePhotos/deleteFacePhoto/${photo.id}`,
-        { photoPublicId: photo.photoPublicId }, { headers });
-      showMessage("Deleted successfully!")
-      handleGetStudentFacePhotos()
-      setDeleting(false)
-    } catch (err) {
-      showMessage("Something went wrong!")
-      setDeleting(!deleting)
-      console.log(err);
-    }
-  }
-
-  const handleUploadFacePhoto = async () => {
-    setLoading(!loading)
-    try {
-      const response = await axios.post(`${url}/api/facePhotos`,
-        { owner: studentId, facePhoto: facePhoto, faceDescriptor: faceDesc.toString() }, headers);
-      setLoading(false)
-      handleGetStudentFacePhotos()
-      showMessage(`Successfully uploaded!`)
-      setSuccess(!success)
-    } catch (error) {
-      setLoading(!loading)
-      console.error('An error occurred:', error);
-      showMessage("Something went wrong while uploading")
-    }
-    // console.log(studentId, facePhoto, faceDesc.toString())
-  }
-
-
-  useEffect(() => {
-    handleGetData()
-    handleGetStudentFacePhotos()
-  }, [])
-
-
-  // Demo visitors each register their own face, so the shared uploader is hidden.
-  if (isDemoEmail(profile?.email)) {
     return (
-      <div className="p-4 text-green-700">
-        <div className="border-b-2 w-full border-green-700">
-          <p className="my-2 text-green-700 text-lg ml-4">{profile.firstName} {profile.lastName} &#40;{profile.section}&#41;</p>
-        </div>
-        <div className="m-4 grid gap-4 justify-items-start">
-          <p className="text-gray-700">Each visitor registers their own face for Demo Student, so no two visitors share one.</p>
-          <Link href="/DemoFace" className="bg-green-700 text-white px-4 py-2 rounded-full">Register your face</Link>
-          <button onClick={goBack} className="bg-green-700 text-white px-4 rounded-full">Back</button>
-        </div>
-      </div>
+        <>
+            <PageHeader back={back} title="Face photos" description={`The camera recognizes ${student.data.firstName} using these photos. Add 2 or 3 clear, front-facing ones.`} />
+            <div className="grid gap-6 lg:grid-cols-2">
+                <Card>
+                    <CardHeader title="Add a face photo" description="Good light, face the camera, nobody else in view." />
+                    <div className="p-5">
+                        <FaceCapture onSave={save} saving={saving} saveLabel="Save face photo" />
+                    </div>
+                </Card>
+                <Card>
+                    <CardHeader title={`Saved photos${photos.data ? ` (${photos.data.length})` : ""}`} />
+                    <div className="p-5">
+                        {photos.loading ? <PageLoader /> : photos.data?.length ? (
+                            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                                {photos.data.map((photo) => (
+                                    <li key={photo.id} className="group relative overflow-hidden rounded-lg ring-1 ring-slate-200">
+                                        <Image src={photo.photoUrl} alt={`Face photo of ${fullName(student.data)}`} width={240} height={240} className="aspect-square w-full object-cover" />
+                                        <div className="absolute right-1.5 top-1.5 rounded-lg bg-white/90 shadow-sm">
+                                            <IconButton icon={HiOutlineTrash} tone="danger" label="Delete photo" onClick={() => remove(photo)} />
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="py-8 text-center text-sm text-slate-500">No face photos yet. Until you add one, the camera can&apos;t recognize this student.</p>
+                        )}
+                    </div>
+                </Card>
+            </div>
+        </>
     );
-  }
-
-  return (
-    <div className="p-4 text-green-700">
-      <Message />
-      <div className="border-b-2 w-full border-green-700">
-        <p className="my-2 text-green-700 text-lg ml-4">{profile?.firstName} {profile?.lastName} &#40;{profile?.section}&#41;</p>
-      </div>
-      <div className="grid grid-cols-4">
-        {/* <button className="bg-green-700 text-white px-4" onClick={handleGetStudentFacePhotos}>Get Images</button> */}
-        <div className="col-span-1 hidden md:grid gap-4 justify-center m-2">
-          {facePhoto &&
-            <div className="grid justify-center">
-              <p>Upcoming Image:</p>
-              < Image
-                alt="Face"
-                width={120}
-                height={120}
-                src={facePhoto && facePhoto}
-              /> </div>
-          }
-          {savedImages && (
-            <div>
-              <p>Saved Images:</p>
-              {savedImages.map((photo, index) => (
-                <div key={index} className="grid gap-1 my-2 h-max justify-center">
-                  <Image src={photo.photoUrl} height={150} width={150} alt={index} />
-                  <button
-                    className="bg-red-700 text-white text-center w-full"
-                    onClick={() => handleDeleteStudentFacePhotos(photo, index)}
-                  >
-                    {deleting && deletingIndex === index ? "Deleting" : "Delete"}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-
-        </div>
-        <div className={`${!savedImages && !facePhoto ? "col-span-4 grid" : "col-span-4 grid md:col-span-3"}  h-max justify-center items-center gap-4`}>
-          <div className="m-2 flex gap-4">
-            <label className="">Upload Image Option:</label>
-            <select
-              defaultValue={DEFAULT_UPLOAD_OPTION}
-              value={selectedUploadOption}
-              className="border-green-700 rounded-lg border-2"
-              onChange={(e) => handleSelectUploadOption(e.target.value)}
-            >
-              {UPLOAD_OPTION.map((op) => (
-                <option key={op} value={op}>
-                  {op}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            {!isAllModelLoaded && <div className="bg-white p-4 rounded-md">
-              <> <h2 className="text-xl font-semibold mb-4">Please wait...</h2>
-                <ModelLoadStatus errorMessage={loadingMessageError} />
-              </>
-            </div>}
-            <br />
-            {!isAllModelLoaded ? (
-              <ModelLoading loadingMessage={loadingMessage} />
-            ) : loadingMessageError ? (
-              <div className="error">{loadingMessageError}</div>
-            ) : (
-              isAllModelLoaded &&
-              loadingMessageError.length === 0 && (
-                <div>
-                  {selectedUploadOption === "From Webcam" ? (
-                    <UploadFromWebcam
-                      setFacePhoto={setFacePhoto}
-                      handleUploadFacePhoto={handleUploadFacePhoto}
-                      setFaceDesc={setFaceDesc}
-                      loading={loading}
-                      success={success}
-                      handleSelectUploadOption={handleSelectUploadOption}
-                    />
-                  ) : (
-                    <UploadFromDisk
-                      setFacePhoto={setFacePhoto}
-                      handleUploadFacePhoto={handleUploadFacePhoto}
-                      setFaceDesc={setFaceDesc}
-                      loading={loading}
-                      success={success}
-                    />
-                  )}
-                </div>
-              )
-            )}
-          </div>
-        </div>
-        <div className={`fixed bottom-2 flex w-full justify-center`}>
-          <div className={`flex justify-between mx-4 ${active === "/Admin" ? "grid gap-2 w-full" : "w-full md:w-1/4"}`}>
-            <button onClick={goBack} className="bg-green-700 text-white px-4 rounded-full" >Back</button>
-          </div>
-        </div>
-        <div className="col-span-4 md:hidden grid gap-4 justify-center m-4">
-          {facePhoto &&
-            <div className="grid justify-center">
-              <p>Upcoming Image:</p>
-              < Image
-                alt="Face"
-                width={120}
-                height={120}
-                src={facePhoto && facePhoto[0].preview}
-              /> </div>
-          }
-          <p>Saved Images:</p>
-          {savedImages?.map((photo, index) =>
-            <div key={index} className="grid gap-1 h-max justify-center">
-              <Image src={photo.photoUrl} height={150} width={150} alt={index} />
-              <button className="bg-red-700 text-white text-center w-full"
-                onClick={() => handleDeleteStudentFacePhotos(photo, index)}>
-                {deleting && deletingIndex === index ? "Deleting" : "Delete"}</button>
-            </div>
-          )}
-
-        </div>
-      </div>
-    </div>
-  );
 };
 
-AddFacePhoto.displayName = 'AddFacePhoto';
-
-
-export default withSuspense(AddFacePhoto);
+export default withSuspense(FacePhotosPage);

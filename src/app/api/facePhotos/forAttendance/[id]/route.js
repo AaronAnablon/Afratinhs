@@ -1,41 +1,32 @@
 import prisma from "@/utils/prismadb"
 import { NextResponse } from "next/server";
+import { ADMIN, TEACHER, findAttendanceFor, scopeOf, withAuth } from "@/utils/apiAuth";
 import { getActiveDemoFaces, getDemoStudent, getVisitorId } from "@/utils/demoVisitor";
 
-// Face data for the students in one attendance record. The demo student's
-// face is the current visitor's own registered face, never another visitor's.
-export const GET = async (request, { params }) => {
-    try {
-        const { id } = await params;
-        const attendance = await prisma.attendance.findUnique({ where: { id } });
-        if (!attendance) {
-            return NextResponse.json({ message: "Attendance not found" }, { status: 404 });
-        }
+// Face data for the students in one class. The demo student's face is the
+// current visitor's own registered face, never another visitor's.
+export const GET = withAuth([ADMIN, TEACHER], async (request, { params }, user) => {
+    const { id } = await params;
+    const attendance = await findAttendanceFor(user, id);
 
-        const studentIds = (attendance.students || []).map((student) => student.id);
-        const demoStudent = await getDemoStudent();
+    const studentIds = (attendance.students || []).map((student) => student.id);
+    const demoStudent = user.isDemo ? await getDemoStudent() : null;
 
-        const faces = await prisma.facephotos.findMany({
-            where: { owner: { in: studentIds.filter((studentId) => studentId !== demoStudent?.id) } },
-            select: { owner: true, photoUrl: true, photoPublicId: true, faceDescriptor: true },
-        });
+    const faces = await prisma.facephotos.findMany({
+        where: {
+            owner: { in: studentIds.filter((studentId) => studentId !== demoStudent?.id) },
+            ...scopeOf(user),
+        },
+        select: { owner: true, faceDescriptor: true },
+    });
 
-        const visitorId = await getVisitorId();
-        if (demoStudent && visitorId && studentIds.includes(demoStudent.id)) {
-            const demoFaces = await getActiveDemoFaces(visitorId);
-            faces.push(...demoFaces.map((face) => ({
-                owner: demoStudent.id,
-                photoUrl: "",
-                photoPublicId: "",
-                faceDescriptor: face.faceDescriptor,
-            })));
-        }
-
-        return NextResponse.json(faces);
-    } catch (err) {
-        console.log(err)
-        return NextResponse.json({ message: "GET Error" }, { status: 500 });
+    const visitorId = await getVisitorId();
+    if (demoStudent && visitorId && studentIds.includes(demoStudent.id)) {
+        const demoFaces = await getActiveDemoFaces(visitorId);
+        faces.push(...demoFaces.map((face) => ({ owner: demoStudent.id, faceDescriptor: face.faceDescriptor })));
     }
-};
+
+    return NextResponse.json(faces);
+});
 
 export const revalidate = 0;

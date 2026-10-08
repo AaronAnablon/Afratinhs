@@ -8,10 +8,24 @@ module.exports = {
   ],
   theme: {
     extend: {
-      backgroundImage: {
-        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'gradient-conic':
-          'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
+      colors: {
+        // School green from the logo
+        brand: {
+          50: '#effaf2',
+          100: '#d9f2e0',
+          200: '#b5e4c4',
+          300: '#83cf9e',
+          400: '#4fb374',
+          500: '#2c9656',
+          600: '#1e7944',
+          700: '#196139',
+          800: '#174d30',
+          900: '#143f29',
+          950: '#0a2316',
+        },
+      },
+      boxShadow: {
+        card: '0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 3px 0 rgb(15 23 42 / 0.06)',
       },
     },
   },

@@ -6,18 +6,23 @@ Attendance Facial Recognition App for Talangan Integrated National High School. 
 
 The homepage lists demo Admin, Teacher and Student logins that visitors can use with one click. The emails and passwords are in `src/globalData/demoAccounts/accounts.json`.
 
-1. Copy `.env.local.example` to `.env.local` and fill in the database and Cloudinary values.
-2. Run `npm run seed:demo` to create the three accounts, a "Demo Section" and a few class schedules in that database. Running it again resets the demo passwords and schedules.
-3. On Vercel, set `CRON_SECRET` to a long random string. `vercel.json` then calls `/api/demo/reset` every night at 16:00 UTC (midnight in the Philippines) to rebuild the demo data.
+1. Copy `.env.local.example` to `.env.local` and fill in the database, `NEXTAUTH_SECRET` and Cloudinary values.
+2. Run `npm run seed:demo` to create the three accounts, a "Demo Section" and a few class schedules in that database. Running it again resets all demo data.
+3. On Vercel, set `NEXTAUTH_SECRET` (required, logins fail without it) and `CRON_SECRET` to long random strings. `vercel.json` calls `/api/demo/reset` every night at 16:00 UTC (midnight in the Philippines) to rebuild the demo data.
 
 How the demo works:
 
+- Demo data is kept apart from real school data. Records created by demo accounts are marked `isDemo`; demo users only ever see those, and real users never see them. The nightly reset deletes everything demo users created.
 - The first time a visitor logs in with a demo account, they register their face at `/DemoFace` (webcam or photo, with consent). Only the 128-number face descriptor is stored, never the photo.
 - The face is tied to a random ID in a browser cookie, so visitors never share faces. When the demo Teacher records attendance, the only face used for Demo Student is the current visitor's.
 - Visitor faces are deleted after 24 hours, or right away with "Delete my face".
 - The three demo accounts can't be edited, deleted or given a profile photo.
 
-Anyone using the admin demo can view and change every record, so run the public demo as a separate Vercel project with its own database, and set `NEXT_PUBLIC_DEMO_MODE=false` on the real school deployment to turn the demo off there.
+To turn the demo off on a deployment, set `NEXT_PUBLIC_DEMO_MODE=false`.
+
+## Access rules
+
+Every API route checks the login session and role (`src/utils/apiAuth.js`): admins manage everything in their scope, teachers only see and edit their own classes, and students only see their own section and attendance. Responses never include password hashes.
 
 This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 

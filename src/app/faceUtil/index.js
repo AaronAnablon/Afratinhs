@@ -1,81 +1,47 @@
 import * as faceapi from 'face-api.js';
 
-export async function loadModels(
-    setLoadingMessage,
-    setLoadingMessageError
-) {
-    const MODEL_URL = "/models";
+const MODEL_URL = "/models";
+let modelsPromise;
 
-    try {
-        setLoadingMessage('Loading Face Detector');
-        await faceapi.loadSsdMobilenetv1Model(MODEL_URL);
+export const modelsLoaded = () =>
+    !!faceapi.nets.ssdMobilenetv1.params &&
+    !!faceapi.nets.faceLandmark68TinyNet.params &&
+    !!faceapi.nets.faceRecognitionNet.params;
 
-        setLoadingMessage('Loading 68 Facial Landmark Detector');
-        await faceapi.loadFaceLandmarkTinyModel(MODEL_URL);
-
-        setLoadingMessage('Loading Feature Extractor');
-        await faceapi.loadFaceRecognitionModel(MODEL_URL);
-    } catch (err) {
-        console.log(err)
-        setLoadingMessageError(
-            'Model loading failed. Please contact the Developer for this bug.'
-        );
-    }
-}
-
-export async function getFullFaceDescription(blob, inputSize = 512) {
-    // tiny_face_detector options
-    let scoreThreshold = 0.8;
-    const OPTION = new faceapi.SsdMobilenetv1Options({
-        inputSize,
-        scoreThreshold,
+// Downloads the three face models once and shares the result.
+export function ensureModelsLoaded() {
+    modelsPromise ??= Promise.all([
+        faceapi.loadSsdMobilenetv1Model(MODEL_URL),
+        faceapi.loadFaceLandmarkTinyModel(MODEL_URL),
+        faceapi.loadFaceRecognitionModel(MODEL_URL),
+    ]).catch((error) => {
+        modelsPromise = undefined;
+        throw error;
     });
-    const useTinyModel = true;
+    return modelsPromise;
+}
 
-    // fetch image to api
-    let img = await faceapi.fetchImage(blob);
-
-    // detect all faces and generate full description from image
-    // including landmark and descriptor of each face
-    let fullDesc = await faceapi
-        .detectAllFaces(img, OPTION)
-        .withFaceLandmarks(useTinyModel)
+// Detects every face in an image (data URL) with its 128-number descriptor.
+export async function getFullFaceDescription(imageSource) {
+    const options = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.8 });
+    const img = await faceapi.fetchImage(imageSource);
+    return faceapi
+        .detectAllFaces(img, options)
+        .withFaceLandmarks(true)
         .withFaceDescriptors();
-    return fullDesc;
 }
 
-export async function createMatcher(faceProfile, maxDescriptorDistance) {
-    // console.log("createMatcher", faceProfile);
+export const descriptorToString = (descriptor) => Array.from(descriptor).join(",");
 
-    // Create labeled descriptors for each face profile
-    let labeledDescriptors = faceProfile.map(
-        (profile) =>
-            new faceapi.LabeledFaceDescriptors(
-                profile.owner,
-                profile.photos.map(
-                    (photo) => new Float32Array(photo.faceDescriptor.match(/-?\d+(?:\.\d+)?/g).map(Number))
-                )
-            )
-    );
+const parseDescriptor = (text) => new Float32Array(String(text).match(/-?\d+(?:\.\d+)?(?:e-?\d+)?/gi).map(Number));
 
-    // Create face matcher with the labeled descriptors and maximum descriptor distance
-    let faceMatcher = new faceapi.FaceMatcher(
-        labeledDescriptors,
-        maxDescriptorDistance
-    );
-
-    return faceMatcher;
-}
-
-
-export function isFaceDetectionModelLoaded() {
-    return !!faceapi.nets.ssdMobilenetv1.params;
-}
-
-export function isFeatureExtractionModelLoaded() {
-    return !!faceapi.nets.faceRecognitionNet.params;
-}
-
-export function isFacialLandmarkDetectionModelLoaded() {
-    return !!faceapi.nets.faceLandmark68TinyNet.params;
+// Builds a matcher from [{ owner, faceDescriptor }]; labels are the owners' ids.
+export function createMatcher(faces, maxDescriptorDistance = 0.45) {
+    const byOwner = new Map();
+    for (const face of faces) {
+        if (!byOwner.has(face.owner)) byOwner.set(face.owner, []);
+        byOwner.get(face.owner).push(parseDescriptor(face.faceDescriptor));
+    }
+    const labeled = [...byOwner].map(([owner, descriptors]) => new faceapi.LabeledFaceDescriptors(owner, descriptors));
+    return labeled.length ? new faceapi.FaceMatcher(labeled, maxDescriptorDistance) : null;
 }

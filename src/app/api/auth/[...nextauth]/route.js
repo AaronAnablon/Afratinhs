@@ -2,6 +2,7 @@ import NextAuth from 'next-auth';
 import prisma from "@/utils/prismadb"
 import CredentialsProvider from 'next-auth/providers/credentials'
 import bcrypt from 'bcrypt'
+import { AUTH_SECRET } from '@/utils/authSecret'
 
 
 
@@ -14,11 +15,13 @@ const handler = NextAuth({
                 password: { label: 'Password', type: 'password' }
             },
             async authorize(credentials) {
-                const user = await prisma.people.findMany({
-                    where: { email: credentials.email, }
+                const user = await prisma.people.findFirst({
+                    where: { email: { equals: String(credentials.email).trim(), mode: "insensitive" } }
                 });
-                if (user && bcrypt.compareSync(credentials.password, user[0].password)) {
-                    return user
+                if (user && bcrypt.compareSync(credentials.password, user.password)) {
+                    // Never put the password hash in the session.
+                    const { password, ...safeUser } = user
+                    return safeUser
                 }
                 return null;
             }
@@ -27,17 +30,15 @@ const handler = NextAuth({
     callbacks: {
         async jwt({ token, user }) {
             if (user) {
-                token = user[0]
+                token = user
             }
             return token
         },
-        async session({ session, token }) {
-            session = token
-            return session;
+        async session({ token }) {
+            return token;
         },
     },
-    secret: 'super secret',
+    secret: AUTH_SECRET,
 });
 
 export { handler as GET, handler as POST }
-

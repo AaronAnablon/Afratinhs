@@ -1,34 +1,34 @@
 import prisma from "@/utils/prismadb"
 import { NextResponse } from "next/server"
 import bcrypt from 'bcrypt';
+import {
+    ADMIN, STUDENT, addStudentToSection, assertEmailAvailable, demoStamp, readJson,
+    requireFields, withAuth, withoutPassword,
+} from "@/utils/apiAuth"
 
-export const POST = async (request) => {
-    try {
-        const body = await request.json();
-        const { firstName, lastName, email, homeAddress,age,  contact, section, adviser, password, role } = body;
+// Creates a student and adds them to every class of their section.
+export const POST = withAuth([ADMIN], async (request, context, user) => {
+    const body = await readJson(request);
+    requireFields(body, ["firstName", "lastName", "email", "password", "section"]);
 
-        const saltRounds = 10
-
-        const hashedPassword = await bcrypt.hash(password, saltRounds);
-        const newPost = await prisma.people.create({
-            data: {
-                firstName,
-                lastName,
-                email,
-                homeAddress,
-                age,
-                contact,
-                section,
-                adviser,
-                password: hashedPassword,
-                role
-            },
-        })
-        return NextResponse.json(newPost)
-    } catch (error) {
-        console.error(error);
-        return NextResponse.json({ message: "POST Error", error }, { status: 500 });
-    }
-};
-
-
+    const email = body.email.trim().toLowerCase();
+    await assertEmailAvailable(email);
+    const section = body.section.trim();
+    const newPost = await prisma.people.create({
+        data: {
+            firstName: body.firstName.trim(),
+            lastName: body.lastName.trim(),
+            email,
+            homeAddress: body.homeAddress,
+            age: body.age,
+            contact: body.contact,
+            section,
+            adviser: body.adviser,
+            password: await bcrypt.hash(body.password, 10),
+            role: STUDENT,
+            ...demoStamp(user),
+        },
+    })
+    await addStudentToSection(user, newPost.id, section);
+    return NextResponse.json(withoutPassword(newPost))
+});

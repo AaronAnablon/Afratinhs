@@ -1,89 +1,89 @@
 "use client"
 
-import { signOut } from "next-auth/react";
-import { BsPersonCircle } from "react-icons/bs";
-import { FcDataProtection } from "react-icons/fc";
-import { useSession } from 'next-auth/react';
-import Layout from "./Layout";
-import useConfirmation from "@/utils/ConfirmationHook";
-import { url, headers } from "@/utils/api";
-import { useAccount } from "../contextProvider/AccountProvider";
-import { useEffect, useState } from "react";
-import UploadProfile from "@/components/UploadProfile";
-import Image from "next/image";
-import axios from "axios";
-import useMessageHook from "@/utils/MessageHook";
+import Link from "next/link";
+import { HiOutlineAcademicCap, HiOutlineCalendarDays, HiOutlineChevronRight, HiOutlineRectangleStack, HiOutlineUserGroup } from "react-icons/hi2";
+import { useCurrentUser } from "@/components/AppShell";
+import { ClassList } from "@/components/ClassList";
+import { fullName } from "@/components/ui/Avatar";
+import { ButtonLink } from "@/components/ui/Button";
+import { Card, StatCard } from "@/components/ui/Card";
+import { EmptyState, ErrorState } from "@/components/ui/EmptyState";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { PageLoader } from "@/components/ui/Spinner";
+import { STUDENT, TEACHER } from "@/globalData/roles";
+import { useFetch } from "@/utils/http";
+import { greeting, isToday, uniqueSections } from "@/utils/schedule";
 
-const Page = () => {
-    const { showMessage, Message } = useMessageHook();
-    const [uploadProfile, setUploadProfile] = useState(false)
-    const [account, setAccount] = useState()
-    const profile = useAccount();
-    const { showConfirmation, ConfirmationDialog } = useConfirmation();
-    const { data: session } = useSession();
-    const handleSignOut = (e) => {
-        e.preventDefault();
-        showConfirmation(<div className='grid justify-center gap-4'>
-            <div className='bg-green-700 flex items-center text-white gap-4 rounded-t-lg w-full'><FcDataProtection size={32} />Logout Account</div>
-            <p className='text-xl p-6'>Are you sure you want to logout this account?</p>
-        </div>, () => {
-            signOut({ callbackUrl: `${url}/` })
-        });
-    };
-    const handleGetStudent = async () => {
-        try {
-            const response = await axios.get(`${url}/api/people/${profile?.id}`, { headers });
-            setAccount(response.data)
-        } catch (err) {
-            showMessage("Something went wrong!")
-            console.log(err);
-        }
-    }
-
-
-    useEffect(() => {
-        profile?.id && handleGetStudent()
-    }, [profile])
-    return (
-        <div className="text-green-700 w-screen relative h-screen">
-            <Message />
-            <div className="flex items-center gap-2 mb-4 pl-4 border-b-2 border-green-700">
-                <button className="rounded-full m-4 border-4 border-green-700 text-white bg-green-700"
-                    onClick={() => setUploadProfile(!uploadProfile)}>
-                    {account ?
-                        account?.profile ?
-                            <div className="w-12 h-12 rounded-full object-fill bg-green-700 overflow-hidden border-4 border-white">
-                                <Image
-                                    src={account?.profile}
-                                    alt="profile"
-                                    width={44}
-                                    height={44}
-                                    className="object-fill rounded-full"
-                                />
-                            </div>
-                            :
-                            <BsPersonCircle size={44} />
-                        :
-                        <BsPersonCircle size={44} />
-                    }
-                </button>
-                {session?.firstName} {session?.lastName} &#40;Admin&#41;
-            </div>
-            {uploadProfile && profile && account &&
-                <UploadProfile
-                    handleGetStudent={handleGetStudent}
-                    setUploadProfile={setUploadProfile}
-                    uploadProfile={uploadProfile}
-                    account={account} />}
-            <ConfirmationDialog />
-            <p className="pl-4">Application Control</p>
-            <Layout />
-            <div className="w-full absolute bottom-8 flex justify-center items-center">
-                <button className="bg-green-700 text-white px-4 py-2 rounded-lg"
-                    onClick={handleSignOut}>Log Out</button>
-            </div>
+const QuickLink = ({ href, icon: Icon, title, text }) => (
+    <Link href={href} className="flex items-center gap-4 px-4 py-4 transition hover:bg-slate-50">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
+            <Icon className="h-5 w-5" aria-hidden="true" />
         </div>
+        <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-slate-900">{title}</p>
+            <p className="text-sm text-slate-500">{text}</p>
+        </div>
+        <HiOutlineChevronRight className="h-5 w-5 text-slate-400" aria-hidden="true" />
+    </Link>
+);
+
+export default function AdminDashboard() {
+    const { user } = useCurrentUser();
+    const people = useFetch("/api/people");
+    const classes = useFetch("/api/attendance");
+
+    if (people.error || classes.error) {
+        return <ErrorState message={people.error || classes.error} onRetry={() => { people.reload(); classes.reload(); }} />;
+    }
+    if (people.loading || classes.loading) return <PageLoader />;
+
+    const teachers = people.data.filter((person) => person.role === TEACHER);
+    const students = people.data.filter((person) => person.role === STUDENT);
+    const sections = uniqueSections([...classes.data, ...students]);
+    const todaysClasses = classes.data.filter(isToday);
+    const teacherName = (id) => fullName(teachers.find((teacher) => teacher.id === id)) || "Unknown teacher";
+
+    return (
+        <>
+            <PageHeader title={`${greeting()}, ${user.firstName}`} description="Here's an overview of attendance at school today." />
+
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <StatCard icon={HiOutlineUserGroup} label="Teachers" value={teachers.length} />
+                <StatCard icon={HiOutlineAcademicCap} label="Students" value={students.length} tone="sky" />
+                <StatCard icon={HiOutlineRectangleStack} label="Sections" value={sections.length} tone="amber" />
+                <StatCard icon={HiOutlineCalendarDays} label="Classes today" value={todaysClasses.length} tone="rose" />
+            </div>
+
+            <div className="mt-8 grid gap-8 lg:grid-cols-3">
+                <section className="lg:col-span-2">
+                    <h2 className="mb-3 text-base font-semibold text-slate-900">Today&apos;s classes</h2>
+                    <ClassList
+                        records={todaysClasses}
+                        dayHeadings={false}
+                        renderMeta={(record) => <span className="text-xs text-slate-500">{teacherName(record.teacher)}</span>}
+                        renderActions={(record) => (
+                            <ButtonLink size="sm" variant="secondary" href={`/Admin/TeacherSchedule/Schedule?id=${record.teacher}`}>
+                                Teacher schedule
+                            </ButtonLink>
+                        )}
+                        emptyState={(
+                            <EmptyState
+                                icon={HiOutlineCalendarDays}
+                                title="No classes today"
+                                description="Classes you schedule for teachers appear here on their day."
+                                action={<ButtonLink variant="secondary" href="/Admin/TeacherSchedule">Go to teachers</ButtonLink>}
+                            />
+                        )}
+                    />
+                </section>
+                <section>
+                    <h2 className="mb-3 text-base font-semibold text-slate-900">Manage</h2>
+                    <Card className="divide-y divide-slate-100 overflow-hidden">
+                        <QuickLink href="/Admin/TeacherSchedule" icon={HiOutlineUserGroup} title="Teachers" text="Add teachers and plan their classes" />
+                        <QuickLink href="/Admin/Sections" icon={HiOutlineRectangleStack} title="Sections" text="Students, attendance and face photos" />
+                    </Card>
+                </section>
+            </div>
+        </>
     );
 }
-
-export default Page;

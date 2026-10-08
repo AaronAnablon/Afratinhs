@@ -1,100 +1,45 @@
 "use client"
 
-import Layout from "../Layout";
-import { usePathname } from "next/navigation";
-import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
-import axios from "axios";
-import { LoadingSpin } from "@/utils/LoadingSpin";
-import { url, headers } from "@/utils/api";
-import { useAccount } from "@/app/contextProvider/AccountProvider";
-import Link from "next/link";
-import Modal from "@/utils/Modal";
-import useMessageHook from "@/utils/MessageHook";
+import { useState } from "react";
+import { HiOutlineCalendarDays } from "react-icons/hi2";
+import { useCurrentUser } from "@/components/AppShell";
+import { ClassList } from "@/components/ClassList";
+import { EmptyState, ErrorState } from "@/components/ui/EmptyState";
+import { Segmented } from "@/components/ui/Field";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { PageLoader } from "@/components/ui/Spinner";
+import { useFetch } from "@/utils/http";
+import { isUpcoming } from "@/utils/schedule";
 
-const Page = () => {
-    const profile = useAccount()
-    const [schedule, setSchedule] = useState()
-    const [loading, setLoading] = useState(false)
-    const currentPathname = usePathname()
-    const [active, setActive] = useState()
-    const { showMessage, Message } = useMessageHook();
+export default function StudentSchedulePage() {
+    const { user } = useCurrentUser();
+    const classes = useFetch(user.section ? `/api/attendance/getStudents/${encodeURIComponent(user.section)}` : null);
+    const [tab, setTab] = useState("upcoming");
 
-    useEffect(() => {
-        setActive(currentPathname)
-    }, [currentPathname])
+    if (classes.error) return <ErrorState message={classes.error} onRetry={classes.reload} />;
+    if (classes.loading) return <PageLoader />;
 
-    const router = useRouter();
-
-    const goBack = () => {
-        router.back();
-    };
-
-
-    const handleGetData = async () => {
-        setLoading(true)
-        try {
-            const response = await axios.get(`${url}/api/attendance/getStudents/${profile.section}`, { headers });
-            setSchedule(response.data)
-            setLoading(false)
-        } catch (err) {
-            setLoading(false)
-            showMessage("Something went wrong!")
-            console.log(err);
-        }
-    }
-
-    useEffect(() => {
-        profile && handleGetData()
-    }, [profile])
-
-    const groupByDay = () => {
-        const groupedByDay = {};
-        schedule?.forEach((item) => {
-            const day = new Date(item.date).toLocaleDateString('en-US', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-            });
-
-            if (!groupedByDay[day]) {
-                groupedByDay[day] = [];
-            }
-            groupedByDay[day].push(item);
-        });
-
-        return groupedByDay;
-    };
-    const groupedSchedule = groupByDay(schedule);
+    const records = classes.data || [];
+    const upcoming = records.filter(isUpcoming);
+    const past = records.filter((record) => !isUpcoming(record));
 
     return (
-        <Layout>
-            <Message />
-            <div className="w-full flex justify-center gap-4 mb-20">
-                {loading && <Modal>
-                    <LoadingSpin loading={loading} />
-                </Modal>}
-                <div className="grid gap-4 w-full mx-4">
-                    {Object.keys(groupedSchedule)?.map((day, index) => (
-                        <ul className="px-6 text-white bg-green-700 rounded-lg py-2 grid " key={index}>
-                            <h2 className="text-white">{day}</h2>
-                            {groupedSchedule[day].map((item, itemIndex) => (
-                                <li className="flex justify-between my-1" key={itemIndex}>
-                                    <p>{item.time} &#40;{item.section}&#41; {item.event}</p>
-                                </li>
-                            ))}
-                        </ul>
-                    ))}
-                </div>
-            </div>
-            <div className={`fixed bottom-2 flex w-full justify-center`}>
-                <div className={`flex justify-between mx-4 ${active === "/Admin" ? "grid gap-2 w-full" : "w-full md:w-1/4"}`}>
-                    <Link href={"/Student"} className="bg-green-700 text-white px-4 rounded-full" >Back</Link>
-                </div>
-            </div>
-        </Layout>
+        <>
+            <PageHeader title="Schedule" description={user.section ? `Classes for ${user.section}` : "You aren't in a section yet."} />
+            <Segmented
+                className="mb-5"
+                value={tab}
+                onChange={setTab}
+                options={[
+                    { value: "upcoming", label: `Upcoming (${upcoming.length})` },
+                    { value: "past", label: `Past (${past.length})` },
+                ]}
+            />
+            <ClassList
+                records={tab === "upcoming" ? upcoming : past}
+                order={tab === "upcoming" ? "asc" : "desc"}
+                emptyState={<EmptyState icon={HiOutlineCalendarDays} title={tab === "upcoming" ? "No upcoming classes" : "No past classes"} />}
+            />
+        </>
     );
 }
-
-export default Page;

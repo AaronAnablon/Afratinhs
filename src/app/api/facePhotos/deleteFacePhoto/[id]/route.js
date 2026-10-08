@@ -1,6 +1,7 @@
 import prisma from "@/utils/prismadb"
 import { v2 as cloudinary } from 'cloudinary';
 import { NextResponse } from "next/server";
+import { ADMIN, ApiError, isObjectId, scopeOf, withAuth } from "@/utils/apiAuth";
 
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -9,23 +10,12 @@ cloudinary.config({
     secure: true
 });
 
-export const PUT = async (request, { params }) => {
-    try {
-        const { id } = await params;
-        const body = await request.json();
-        const { photoPublicId } = body;
+export const PUT = withAuth([ADMIN], async (request, { params }, user) => {
+    const { id } = await params;
+    const photo = isObjectId(id) && await prisma.facephotos.findFirst({ where: { id, ...scopeOf(user) } });
+    if (!photo) throw new ApiError(404, "Photo not found.");
 
-        const destroy = await cloudinary.uploader.destroy(photoPublicId, { invalidate: true });
-        if (destroy) {
-            const deletePhoto = await prisma.facephotos.delete({
-                where: {
-                    id
-                }
-            });
-            return NextResponse.json(deletePhoto);
-        }
-    } catch (err) {
-        console.log(err)
-        return NextResponse.json({ message: "DELETE Error", err }, { status: 500 });
-    }
-};
+    await cloudinary.uploader.destroy(photo.photoPublicId, { invalidate: true });
+    const deletePhoto = await prisma.facephotos.delete({ where: { id: photo.id } });
+    return NextResponse.json({ id: deletePhoto.id });
+});

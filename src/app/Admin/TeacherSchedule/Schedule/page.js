@@ -1,172 +1,110 @@
 "use client"
 
-import Layout from "../../Layout";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
-import { withSuspense } from "@/utils/withSuspense";
-import axios from "axios";
-import { LoadingSpin } from "@/utils/LoadingSpin";
-import { url, headers } from "@/utils/api";
-import AddSchedule from "./AddSchedule";
+import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { FaEdit } from "react-icons/fa";
-import { RiDeleteBin5Line } from "react-icons/ri";
-import EditSchedule from "./EditSchedule";
-import useConfirmation from "@/utils/ConfirmationHook";
-import { FcDataProtection } from "react-icons/fc";
-import Modal from "@/utils/Modal";
-import useMessageHook from "@/utils/MessageHook";
+import { HiOutlineCalendarDays, HiOutlinePencilSquare, HiOutlinePlus, HiOutlineTrash } from "react-icons/hi2";
+import { ClassList } from "@/components/ClassList";
+import { ScheduleFormDialog } from "@/components/forms/ScheduleFormDialog";
+import { fullName } from "@/components/ui/Avatar";
+import { Button, IconButton } from "@/components/ui/Button";
+import { EmptyState, ErrorState } from "@/components/ui/EmptyState";
+import { useConfirm, useToast } from "@/components/ui/Feedback";
+import { Segmented } from "@/components/ui/Field";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { PageLoader } from "@/components/ui/Spinner";
+import { api, errorMessage, useFetch } from "@/utils/http";
+import { displayTime, isUpcoming, uniqueSections } from "@/utils/schedule";
+import { withSuspense } from "@/utils/withSuspense";
 
-const Page = () => {
-    const { showMessage, Message } = useMessageHook();
-    const { showConfirmation, ConfirmationDialog } = useConfirmation();
-    const [add, setAdd] = useState(false)
-    const [edit, setEdit] = useState(false)
-    const [clickedAttendance, setClickedAttendance] = useState()
-    const [schedule, setSchedule] = useState()
-    const [teacher, setTeacher] = useState()
-    const [loading, setLoading] = useState(false)
-    const currentPathname = usePathname()
-    const [active, setActive] = useState()
+const TeacherSchedulePage = () => {
+    const toast = useToast();
+    const confirm = useConfirm();
+    const teacherId = useSearchParams().get("id");
+    const teacher = useFetch(teacherId ? `/api/people/${teacherId}` : null);
+    const classes = useFetch(teacherId ? `/api/attendance/${teacherId}` : null);
+    const allClasses = useFetch("/api/attendance");
+    const [tab, setTab] = useState("upcoming");
+    const [dialog, setDialog] = useState(null);
 
-    useEffect(() => {
-        setActive(currentPathname)
-    }, [currentPathname])
+    const error = teacher.error || classes.error;
+    if (error) return <ErrorState message={error} onRetry={() => { teacher.reload(); classes.reload(); }} />;
+    if (teacher.loading || classes.loading) return <PageLoader />;
 
-    const router = useRouter();
+    const upcoming = classes.data.filter(isUpcoming);
+    const past = classes.data.filter((record) => !isUpcoming(record));
 
-    const goBack = () => {
-        router.back();
+    const reload = () => {
+        classes.reload();
+        allClasses.reload();
     };
 
-    const searchParams = useSearchParams()
-    const teacherId = searchParams.get('id')
-
-    const handleGetTeacher = async () => {
-        setLoading(true)
-        try {
-            const response = await axios.get(`${url}/api/people/${teacherId}`, { headers });
-            setTeacher(response.data)
-            setLoading(false)
-        } catch (err) {
-            setLoading(false)
-            showMessage("Something went wrong!")
-            console.log(err);
-        }
-    }
-
-
-    const handleGetData = async () => {
-        setLoading(true)
-        try {
-            const response = await axios.get(`${url}/api/attendance/${teacherId}`, { headers });
-            setSchedule(response.data)
-            setLoading(false)
-        } catch (err) {
-            setLoading(false)
-            showMessage("Something went wrong!")
-            console.log(err);
-        }
-    }
-
-    useEffect(() => {
-        handleGetData()
-        handleGetTeacher()
-    }, [])
-
-    const groupByDay = () => {
-        const groupedByDay = {};
-        schedule?.forEach((item) => {
-            const day = new Date(item.date).toLocaleDateString('en-US', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-            });
-
-            if (!groupedByDay[day]) {
-                groupedByDay[day] = [];
-            }
-            groupedByDay[day].push(item);
+    const remove = async (record) => {
+        const ok = await confirm({
+            title: "Delete this class?",
+            message: `${record.event} on ${record.date}, ${displayTime(record.time)}. Its attendance is deleted too.`,
+            confirmLabel: "Delete class",
+            tone: "danger",
         });
-
-        return groupedByDay;
-    };
-    const groupedSchedule = groupByDay(schedule);
-
-    const handleDelete = (id) => {
-        showConfirmation(<div className='grid justify-center gap-4'>
-            <div className='bg-green-700 flex items-center text-white gap-4 rounded-t-lg w-full'><FcDataProtection size={32} />Delete Schedule</div>
-            <p className='text-xl p-6'>Are you sure you want to delete this schedule?</p>
-        </div>, () => {
-            handleDeleteApi(id)
-        });
-    };
-
-    const handleDeleteApi = async (id) => {
-        setLoading(true)
+        if (!ok) return;
         try {
-            await axios.delete(`${url}/api/attendance/${id}`, { headers });
-            handleGetData()
-            showMessage("Succesfully Deleted!")
-            setLoading(false)
-        } catch (err) {
-            setLoading(false)
-            showMessage("Something went wrong!")
-            console.log(err);
+            await api.delete(`/api/attendance/${record.id}`);
+            toast.success("Class deleted.");
+            reload();
+        } catch (requestError) {
+            toast.error(errorMessage(requestError));
         }
-    }
-
-    const handleEdit = (attendance) => {
-        setClickedAttendance(attendance)
-        setEdit(!edit)
-    }
-
+    };
 
     return (
-        <Layout>
-            <Message />
-            {edit && clickedAttendance && <EditSchedule handleGetData={handleGetData} attendance={clickedAttendance} setEdit={setEdit} edit={edit} />}
-            <ConfirmationDialog />
-            {loading && <Modal>
-                <LoadingSpin loading={loading} />
-            </Modal>}
-            <div className="w-full flex justify-center gap-4">
-                <div className="bg-green-700 w-full text-white mx-4 py-2 rounded-lg mb-4 text-center">{teacher?.firstName} {teacher?.lastName}</div>
-            </div>
-            <div className="w-full flex justify-center gap-4 mb-20">
-                <div className="grid gap-4 w-full mx-4">
-                    {Object.keys(groupedSchedule)?.map((day, index) => (
-                        <ul className="text-white bg-green-700 rounded-lg py-2 grid " key={index}>
-                            <h2 className="text-white px-6">{day}</h2>
-                            {groupedSchedule[day].map((item, itemIndex) => (
-                                <li className="flex hover:bg-green-500 px-6 justify-between my-1" key={itemIndex}>
-                                    <p>{item.time} {item.section} &#40;{item.event}&#41;</p>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => handleEdit(item)} className="bg-white rounded-full text-green-700 p-1">
-                                            <FaEdit size={14} /></button>
-                                        <button onClick={() => handleDelete(item.id)} className="bg-white rounded-full text-red-700 p-1">
-                                            <RiDeleteBin5Line size={14} /></button>
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
-                    ))}
-                </div>
-            </div>
-            <div className={`fixed bottom-2 flex w-full justify-center`}>
-                <div className={`flex justify-between mx-4 ${active && active === "/Admin" ? "grid gap-2 w-full" : "w-full md:w-1/4"}`}>
-                    <button onClick={goBack} className="bg-green-700 text-white px-4 rounded-full" >Back</button>
-                    {!add && <button type="button" onClick={() => setAdd(!add)} className="bg-green-700 text-white px-4 rounded-full">Add</button>}
-                </div>
-            </div>
-            {add &&
-                <AddSchedule handleGetData={handleGetData} teacher={teacherId} setAdd={setAdd} add={add} />
-            }
-        </Layout>
-    );
-}
+        <>
+            <PageHeader
+                back={{ href: "/Admin/TeacherSchedule", label: "Teachers" }}
+                title={fullName(teacher.data)}
+                description={teacher.data.email}
+                actions={<Button icon={HiOutlinePlus} onClick={() => setDialog({})}>Add classes</Button>}
+            />
 
-export default withSuspense(Page);
+            <Segmented
+                className="mb-5"
+                value={tab}
+                onChange={setTab}
+                options={[
+                    { value: "upcoming", label: `Upcoming (${upcoming.length})` },
+                    { value: "past", label: `Past (${past.length})` },
+                ]}
+            />
+
+            <ClassList
+                records={tab === "upcoming" ? upcoming : past}
+                order={tab === "upcoming" ? "asc" : "desc"}
+                showCode
+                renderActions={(record) => (
+                    <>
+                        <IconButton icon={HiOutlinePencilSquare} label="Edit class" onClick={() => setDialog({ record })} />
+                        <IconButton icon={HiOutlineTrash} tone="danger" label="Delete class" onClick={() => remove(record)} />
+                    </>
+                )}
+                emptyState={(
+                    <EmptyState
+                        icon={HiOutlineCalendarDays}
+                        title={tab === "upcoming" ? "No upcoming classes" : "No past classes"}
+                        description={tab === "upcoming" ? `Schedule classes for ${teacher.data.firstName} to start taking attendance.` : undefined}
+                        action={tab === "upcoming" && <Button icon={HiOutlinePlus} onClick={() => setDialog({})}>Add classes</Button>}
+                    />
+                )}
+            />
+
+            {dialog && (
+                <ScheduleFormDialog
+                    teacherId={teacherId}
+                    record={dialog.record}
+                    sections={uniqueSections(allClasses.data)}
+                    onClose={() => setDialog(null)}
+                    onSaved={reload}
+                />
+            )}
+        </>
+    );
+};
+
+export default withSuspense(TeacherSchedulePage);

@@ -1,37 +1,29 @@
 import prisma from "@/utils/prismadb"
 import { NextResponse } from "next/server";
+import { ADMIN, ApiError, TEACHER, findAttendanceFor, readJson, withAuth } from "@/utils/apiAuth";
 
+const STATUSES = ["present", "absent"];
 
-export const PUT = async (request, { params }) => {
-    try {
-        const { id } = await params
-        const body = await request.json();
-        const { studentId, statusIn, statusOut, letterUrl, letterPublicId } = body;
+// Sets one student's IN and OUT status for a class.
+export const PUT = withAuth([ADMIN, TEACHER], async (request, { params }, user) => {
+    const { id } = await params;
+    const record = await findAttendanceFor(user, id);
+    const { studentId, statusIn, statusOut } = await readJson(request);
 
-        const findJson = await prisma.attendance.findUnique({
-            where: {
-                id
-            }
-        });
-
-        const updatedRecord = await prisma.attendance.update({
-            where: {
-                id: findJson.id
-            },
-            data: {
-                students: findJson.students.map((student) => {
-                    if (student.id === studentId) {
-                        return { ...student, statusIn, statusOut, letterUrl, letterPublicId };
-                    }
-                    return student;
-                }),
-            },
-        });
-        return NextResponse.json(updatedRecord);
-
-
-    } catch (err) {
-        console.error(err);
-        return NextResponse.json({ message: "Update Error", error: err.message }, { status: 500 });
+    if (![statusIn, statusOut].every((status) => status === undefined || STATUSES.includes(status))) {
+        throw new ApiError(400, "Status must be present or absent.");
     }
-}
+    if (!(record.students || []).some((student) => student.id === studentId)) {
+        throw new ApiError(404, "That student isn't in this class.");
+    }
+
+    const updatedRecord = await prisma.attendance.update({
+        where: { id: record.id },
+        data: {
+            students: record.students.map((student) => student.id === studentId
+                ? { ...student, statusIn, statusOut }
+                : student),
+        },
+    });
+    return NextResponse.json(updatedRecord);
+});

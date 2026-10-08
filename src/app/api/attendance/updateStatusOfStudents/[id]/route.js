@@ -1,46 +1,26 @@
 import prisma from "@/utils/prismadb"
 import { NextResponse } from "next/server";
+import { ADMIN, ApiError, TEACHER, findAttendanceFor, readJson, withAuth } from "@/utils/apiAuth";
 
+// Marks the students recognized by the camera as present, for either the
+// IN (status true) or the OUT (status false) attendance.
+export const PUT = withAuth([ADMIN, TEACHER], async (request, { params }, user) => {
+    const { id } = await params;
+    const record = await findAttendanceFor(user, id);
+    const { studentIds, status } = await readJson(request);
+    if (!Array.isArray(studentIds)) throw new ApiError(400, "Invalid request.");
 
-export const PUT = async (request, { params }) => {
-    try {
-        const { id } = await params;
-        const body = await request.json();
-        const { studentIds, status } = body;
-    
-        const findJson = await prisma.attendance.findUnique({
-            where: {
-                id,
-            },
-        });
-
-        studentIds.forEach((studentId) => {
-            findJson.students = findJson.students.map((student) => {
-                if (student.id === studentId) {
-                    return {
-                        ...student,
-                        statusIn: status ? "present" : student.statusIn,
-                        statusOut: status ? student.statusOut : "present",
-                        letterUrl: student.letterUrl,
-                        letterPublicId: student.letterPublicId
-                    };
-                }
-                return student;
-            });
-        });
-
-        const updatedRecord = await prisma.attendance.update({
-            where: {
-                id: findJson.id,
-            },
-            data: {
-                students: findJson.students,
-            },
-        });
-
-        return NextResponse.json(updatedRecord);
-    } catch (err) {
-        console.error(err);
-        return NextResponse.json({ message: "Update Error", error: err.message }, { status: 500 });
-    }
-};
+    const recognized = new Set(studentIds);
+    const updatedRecord = await prisma.attendance.update({
+        where: { id: record.id },
+        data: {
+            students: (record.students || []).map((student) => {
+                if (!recognized.has(student.id)) return student;
+                return status
+                    ? { ...student, statusIn: "present" }
+                    : { ...student, statusOut: "present" };
+            }),
+        },
+    });
+    return NextResponse.json(updatedRecord);
+});

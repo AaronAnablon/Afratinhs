@@ -1,68 +1,45 @@
 import prisma from "@/utils/prismadb"
 import { NextResponse } from "next/server"
+import {
+    ADMIN, ApiError, TEACHER, demoStamp, generateUniqueCode, isObjectId, readJson,
+    requireFields, scopeOf, sectionStudents, withAuth,
+} from "@/utils/apiAuth"
 
-export const POST = async (request) => {
-    try {
-        const body = await request.json();
-        const { isOn, dates, time, teacher, event, section, students } = body;
+// Creates one class schedule per date for a teacher. The student list is
+// filled from the students currently in the section.
+export const POST = withAuth([ADMIN], async (request, context, user) => {
+    const { dates, time, teacher, event, section } = await readJson(request);
+    requireFields({ time, teacher, event, section }, ["time", "teacher", "event", "section"]);
+    if (!Array.isArray(dates) || dates.length === 0) throw new ApiError(400, "Pick at least one date.");
 
-        const responseArray = [];
+    const teacherAccount = isObjectId(teacher) && await prisma.people.findFirst({
+        where: { id: teacher, role: TEACHER, ...scopeOf(user) },
+    });
+    if (!teacherAccount) throw new ApiError(404, "Teacher not found.");
 
-        for (const date of dates) {
-            let fiveDigitNumber;
-            let isCodeUnique = false;
-
-            do {
-                fiveDigitNumber = Math.floor(10000 + Math.random() * 90000);
-
-                const findCode = await prisma.attendance.findFirst({
-                    where: {
-                        code: fiveDigitNumber
-                    }
-                });
-
-                isCodeUnique = !findCode;
-            } while (!isCodeUnique);
-
-            const newPost = await prisma.attendance.create({
-                data: {
-                    isOn,
-                    date,
-                    time,
-                    teacher,
-                    event,
-                    code: fiveDigitNumber,
-                    section,
-                    students
-                },
-            });
-
-            responseArray.push(newPost);
-        }
-
-        return NextResponse.json({ message: "Registered", newPosts: responseArray });
-
-    } catch (error) {
-        console.error(error);
-        return NextResponse.json({ message: "POST Error", error }, { status: 500 });
+    const students = await sectionStudents(user, section.trim());
+    const newPosts = [];
+    for (const date of dates) {
+        newPosts.push(await prisma.attendance.create({
+            data: {
+                isOn: false,
+                date,
+                time,
+                teacher,
+                event: event.trim(),
+                code: await generateUniqueCode(),
+                section: section.trim(),
+                students,
+                ...demoStamp(user),
+            },
+        }));
     }
-};
+    return NextResponse.json({ message: "Registered", newPosts });
+});
 
+export const GET = withAuth([ADMIN], async (request, context, user) => {
+    const posts = await prisma.attendance.findMany({ where: scopeOf(user) });
+    return NextResponse.json(posts);
+});
 
-
-
-
-export const GET = async () => {
-    try {
-        const posts = await prisma.attendance.findMany({
-        })
-        return NextResponse.json(posts, {
-            headers: {
-                "revalidate": "0"
-            }
-        });
-    } catch (err) {
-        console.log(err)
-        return NextResponse.json({ message: "GET Error", err }, { status: 500 })
-    }
-}
+export const revalidate = 0;

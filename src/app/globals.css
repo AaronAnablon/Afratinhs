@@ -2,17 +2,38 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
+    color-scheme: light;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased;
   }
 }
 
+/* Inline date picker used when scheduling classes */
+/* Scoped under .date-picker so these load-order-independent rules beat the picker's own CSS. */
+.date-picker .react-datepicker {
+  @apply rounded-xl border-slate-200 font-sans shadow-card;
+}
+
+.date-picker .react-datepicker__header {
+  @apply rounded-t-xl border-slate-200 bg-slate-50;
+}
+
+.date-picker .react-datepicker__day {
+  @apply rounded-md;
+}
+
+.date-picker .react-datepicker__day--keyboard-selected {
+  @apply bg-transparent text-inherit;
+}
+
+.date-picker .react-datepicker__day--today {
+  @apply font-semibold text-brand-700;
+}
+
+.date-picker .react-datepicker__day--selected {
+  @apply bg-brand-700 text-white hover:bg-brand-800;
+}

@@ -21,6 +21,8 @@ model People {
     profilePublicId String?
     password        String
     role            Int
+    // true for records that belong to the public demo; demo users only see these
+    isDemo          Boolean?
     createdAt       DateTime @default(now())
     updatedAt       DateTime @updatedAt
 }
@@ -31,6 +33,7 @@ model Facephotos {
     photoPublicId  String
     photoUrl       String
     faceDescriptor String
+    isDemo         Boolean?
     createdAt      DateTime @default(now())
     updatedAt      DateTime @updatedAt
 }
@@ -54,6 +57,7 @@ model Attendance {
     code      Int?
     section   String
     students  Json?
+    isDemo    Boolean?
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 }

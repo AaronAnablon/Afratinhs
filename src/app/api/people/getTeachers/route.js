@@ -1,22 +1,10 @@
 import prisma from "@/utils/prismadb"
 import { NextResponse } from "next/server"
+import { ADMIN, TEACHER, scopeOf, withAuth, withoutPassword } from "@/utils/apiAuth"
 
+export const GET = withAuth([ADMIN], async (request, context, user) => {
+    const posts = await prisma.people.findMany({ where: { role: TEACHER, ...scopeOf(user) } })
+    return NextResponse.json(posts.map(withoutPassword));
+});
 
-export const GET = async () => {
-    try {
-        const posts = await prisma.people.findMany({
-            where: {
-                role: 1
-            }
-        })
-        return NextResponse.json(posts, {
-            headers: {
-                "revalidate": 0
-            }
-        });
-    } catch (err) {
-        console.log(err)
-        return NextResponse.json({ message: "GET Error", err }, { status: 500 })
-    }
-}
 export const revalidate = 0;
