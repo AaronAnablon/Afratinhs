@@ -10,7 +10,7 @@ import { LoadingSpin } from '@/utils/LoadingSpin';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import useMessageHook from '@/utils/MessageHook';
-import { DEMO_ACCOUNTS } from '@/globalData/demoAccounts';
+import { DEMO_ACCOUNTS, DEMO_FACE_TTL_HOURS, DEMO_MODE } from '@/globalData/demoAccounts';
 import { FaUserShield, FaChalkboardTeacher, FaUserGraduate, FaCamera, FaCalendarAlt, FaEnvelopeOpenText } from "react-icons/fa";
 
 const ROLE_ICONS = {
@@ -114,7 +114,7 @@ export default function Home() {
               Admins manage schedules and sections, and students can check their own attendance.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <a href="#demo" className="bg-green-700 text-white px-5 py-2 rounded-full hover:bg-green-600">Try the demo</a>
+              {DEMO_MODE && <a href="#demo" className="bg-green-700 text-white px-5 py-2 rounded-full hover:bg-green-600">Try the demo</a>}
               <a href="#how-it-works" className="border border-green-700 text-green-700 px-5 py-2 rounded-full hover:bg-green-50">How it works</a>
             </div>
           </div>
@@ -178,51 +178,52 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="demo" className="max-w-6xl mx-auto px-4 py-16 scroll-mt-4">
-          <h2 className="text-2xl md:text-3xl font-bold text-gray-900">Try it with a demo account</h2>
-          <p className="mt-3 text-gray-600 max-w-3xl">
-            Log in with one click, or copy the email and password into the form above.
-            Demo data is shared by all visitors and is reset from time to time.
-          </p>
-          <div className="mt-8 grid gap-6 md:grid-cols-3">
-            {DEMO_ACCOUNTS.map((account) => {
-              const RoleIcon = ROLE_ICONS[account.role]
-              return (
-                <div key={account.role} className="flex flex-col rounded-xl p-6 border border-green-700/30">
-                  <div className="flex items-center gap-3 text-green-700">
-                    <RoleIcon size={24} />
-                    <h3 className="text-lg font-semibold">{account.role}</h3>
+        {DEMO_MODE &&
+          <section id="demo" className="max-w-6xl mx-auto px-4 py-16 scroll-mt-4">
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-900">Try it with a demo account</h2>
+            <p className="mt-3 text-gray-600 max-w-3xl">
+              Log in with one click, or copy the email and password into the form above.
+              Demo data is shared by all visitors and is reset from time to time.
+            </p>
+            <div className="mt-8 grid gap-6 md:grid-cols-3">
+              {DEMO_ACCOUNTS.map((account) => {
+                const RoleIcon = ROLE_ICONS[account.role]
+                return (
+                  <div key={account.role} className="flex flex-col rounded-xl p-6 border border-green-700/30">
+                    <div className="flex items-center gap-3 text-green-700">
+                      <RoleIcon size={24} />
+                      <h3 className="text-lg font-semibold">{account.role}</h3>
+                    </div>
+                    <p className="mt-3 text-sm text-gray-600 flex-1">{account.description}</p>
+                    <dl className="mt-4 text-sm grid gap-1">
+                      <div className="flex gap-2">
+                        <dt className="text-gray-500 w-20 shrink-0">Email</dt>
+                        <dd className="font-mono break-all select-all">{account.email}</dd>
+                      </div>
+                      <div className="flex gap-2">
+                        <dt className="text-gray-500 w-20 shrink-0">Password</dt>
+                        <dd className="font-mono break-all select-all">{account.password}</dd>
+                      </div>
+                    </dl>
+                    <button
+                      type="button"
+                      onClick={() => handleDemoLogin(account)}
+                      disabled={!!loading}
+                      className="mt-5 w-full py-2 bg-green-700 rounded-full text-white px-4 hover:bg-green-600"
+                    >
+                      {loading === account.role ? <LoadingSpin loading={true} /> : `Log in as ${account.role}`}
+                    </button>
                   </div>
-                  <p className="mt-3 text-sm text-gray-600 flex-1">{account.description}</p>
-                  <dl className="mt-4 text-sm grid gap-1">
-                    <div className="flex gap-2">
-                      <dt className="text-gray-500 w-20 shrink-0">Email</dt>
-                      <dd className="font-mono break-all select-all">{account.email}</dd>
-                    </div>
-                    <div className="flex gap-2">
-                      <dt className="text-gray-500 w-20 shrink-0">Password</dt>
-                      <dd className="font-mono break-all select-all">{account.password}</dd>
-                    </div>
-                  </dl>
-                  <button
-                    type="button"
-                    onClick={() => handleDemoLogin(account)}
-                    disabled={!!loading}
-                    className="mt-5 w-full py-2 bg-green-700 rounded-full text-white px-4 hover:bg-green-600"
-                  >
-                    {loading === account.role ? <LoadingSpin loading={true} /> : `Log in as ${account.role}`}
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-          <p className="mt-8 text-sm text-gray-600 max-w-3xl">
-            <span className="font-semibold text-gray-800">Tip:</span> to see face recognition work,
-            log in as Admin, open Sections &rarr; Demo Section &rarr; Demo Student &rarr; Upload Profile and
-            add a photo of your face. Then log in as Teacher, open a class under Schedule, let the camera
-            recognize you, and untick &quot;Open&quot; to save the attendance.
-          </p>
-        </section>
+                )
+              })}
+            </div>
+            <p className="mt-8 text-sm text-gray-600 max-w-3xl">
+              <span className="font-semibold text-gray-800">Face recognition:</span> the first time you log in
+              with a demo account, you register your face. It stays private to your browser and is deleted after
+              {" "}{DEMO_FACE_TTL_HOURS} hours. Then log in as Teacher, open a class under Schedule, let the camera
+              recognize you as Demo Student, and untick &quot;Open&quot; to save the attendance.
+            </p>
+          </section>}
 
         <footer className="border-t border-green-700/20">
           <div className="max-w-6xl mx-auto px-4 py-6 text-xs text-gray-500">

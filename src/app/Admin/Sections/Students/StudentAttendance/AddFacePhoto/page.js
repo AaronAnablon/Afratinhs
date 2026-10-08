@@ -17,8 +17,10 @@ import ModelLoading from "@/utils/ModelLoading";
 import { UploadFromDisk } from "@/components/Student/UploadFromDisk";
 import { UploadFromWebcam } from "@/components/Student/UploadFromWebCam";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import useMessageHook from "@/utils/MessageHook";
+import { isDemoEmail } from "@/globalData/demoAccounts";
 
 
 const AddFacePhoto = ({ }) => {
@@ -130,6 +132,22 @@ const AddFacePhoto = ({ }) => {
     handleGetStudentFacePhotos()
   }, [])
 
+
+  // Demo visitors each register their own face, so the shared uploader is hidden.
+  if (isDemoEmail(profile?.email)) {
+    return (
+      <div className="p-4 text-green-700">
+        <div className="border-b-2 w-full border-green-700">
+          <p className="my-2 text-green-700 text-lg ml-4">{profile.firstName} {profile.lastName} &#40;{profile.section}&#41;</p>
+        </div>
+        <div className="m-4 grid gap-4 justify-items-start">
+          <p className="text-gray-700">Each visitor registers their own face for Demo Student, so no two visitors share one.</p>
+          <Link href="/DemoFace" className="bg-green-700 text-white px-4 py-2 rounded-full">Register your face</Link>
+          <button onClick={goBack} className="bg-green-700 text-white px-4 rounded-full">Back</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 text-green-700">

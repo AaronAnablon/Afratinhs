@@ -1,6 +1,10 @@
 import prisma from "@/utils/prismadb"
 import { NextResponse } from "next/server";
 import bcrypt from 'bcrypt';
+import { isDemoPersonId } from "@/utils/demoVisitor";
+
+const demoAccountLocked = () =>
+    NextResponse.json({ message: "Demo accounts can't be changed." }, { status: 403 });
 
 export const GET = async (request, { params }) => {
     try {
@@ -24,6 +28,7 @@ export const GET = async (request, { params }) => {
 export const PUT = async (request, { params }) => {
     try {
         const { id } = await params
+        if (await isDemoPersonId(id)) return demoAccountLocked();
         const body = await request.json();
         const { data } = body;
         const { firstName,
@@ -71,6 +76,7 @@ export const PUT = async (request, { params }) => {
 export const DELETE = async (request, { params }) => {
     try {
         const { id } = await params;
+        if (await isDemoPersonId(id)) return demoAccountLocked();
 
         await prisma.people.delete({
             where: {

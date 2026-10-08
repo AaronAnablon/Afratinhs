@@ -93,7 +93,8 @@ const Page = (props) => {
 
     const handleGetFaceData = async () => {
         try {
-            const response = await axios.get(`${url}/api/facePhotos`, { headers });
+            // Relative URL so the demo visitor cookie is always sent.
+            const response = await axios.get(`/api/facePhotos/forAttendance/${attendanceId}`, { headers });
             setFaceData(response.data)
         } catch (err) {
             showMessage("Something went wrong!");

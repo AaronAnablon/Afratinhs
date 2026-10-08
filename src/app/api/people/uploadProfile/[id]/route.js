@@ -1,6 +1,7 @@
 import prisma from "@/utils/prismadb";
 import { v2 as cloudinary } from 'cloudinary';
 import { NextResponse } from "next/server";
+import { isDemoPersonId } from "@/utils/demoVisitor";
 
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -12,6 +13,9 @@ cloudinary.config({
 export const PUT = async (request, { params }) => {
     try {
         const { id } = await params;
+        if (await isDemoPersonId(id)) {
+            return NextResponse.json({ message: "Demo accounts can't change their profile photo." }, { status: 403 });
+        }
         const body = await request.json();
         const { file, account } = body;
         const { profile, profilePublicId } = account

@@ -35,6 +35,15 @@ model Facephotos {
     updatedAt      DateTime @updatedAt
 }
 
+// Face data registered by demo visitors. No photo is stored, only the
+// descriptor, and rows expire 24 hours after createdAt.
+model Demofaces {
+    id             String   @id @default(auto()) @map("_id") @db.ObjectId
+    visitorId      String
+    faceDescriptor String
+    createdAt      DateTime @default(now())
+}
+
 model Attendance {
     id        String   @id @default(auto()) @map("_id") @db.ObjectId
     isOn      Boolean
