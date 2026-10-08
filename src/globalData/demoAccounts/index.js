@@ -1,23 +1,21 @@
-// Demo logins shown on the homepage, read from the NEXT_PUBLIC_DEMO_* env vars.
-// A role is hidden when its email or password is not set.
-// Create the accounts in the database with `npm run seed:demo`.
+// Demo logins shown on the homepage. `npm run seed:demo` creates these same
+// accounts from accounts.json, so change the credentials there only.
+import accounts from "./accounts.json";
+
 export const DEMO_ACCOUNTS = [
     {
         role: "Admin",
-        email: process.env.NEXT_PUBLIC_DEMO_ADMIN_EMAIL,
-        password: process.env.NEXT_PUBLIC_DEMO_ADMIN_PASSWORD,
+        ...accounts.admin,
         description: "Manage teacher accounts, class schedules, sections, students and their face photos.",
     },
     {
         role: "Teacher",
-        email: process.env.NEXT_PUBLIC_DEMO_TEACHER_EMAIL,
-        password: process.env.NEXT_PUBLIC_DEMO_TEACHER_PASSWORD,
+        ...accounts.teacher,
         description: "Open a class schedule and take attendance with the webcam, or review attendance per section.",
     },
     {
         role: "Student",
-        email: process.env.NEXT_PUBLIC_DEMO_STUDENT_EMAIL,
-        password: process.env.NEXT_PUBLIC_DEMO_STUDENT_PASSWORD,
+        ...accounts.student,
         description: "See your class schedule and attendance record, and upload an excuse letter for an absence.",
     },
-].filter((account) => account.email && account.password);
+];

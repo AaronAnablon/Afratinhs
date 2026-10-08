@@ -1,25 +1,17 @@
 // Creates (or resets) the demo accounts shown on the homepage, plus a sample
 // section with a few class schedules so every role has something to look at.
-// Usage: npm run seed:demo   (reads NEXT_PUBLIC_DEMO_* from .env.local or .env)
+// Usage: npm run seed:demo   (uses DATABASE_URL from .env.local or .env)
 require("dotenv").config({ path: ".env.local" });
 require("dotenv").config();
 
 const { PrismaClient } = require("@prisma/client");
 const bcrypt = require("bcrypt");
+const accounts = require("../src/globalData/demoAccounts/accounts.json");
 
 const prisma = new PrismaClient();
 
 const DEMO_SECTION = "Demo Section";
 const DEMO_TEACHER_NAME = { firstName: "Demo", lastName: "Teacher" };
-
-const getCredentials = (role) => {
-    const email = process.env[`NEXT_PUBLIC_DEMO_${role}_EMAIL`];
-    const password = process.env[`NEXT_PUBLIC_DEMO_${role}_PASSWORD`];
-    if (!email || !password) {
-        throw new Error(`Set NEXT_PUBLIC_DEMO_${role}_EMAIL and NEXT_PUBLIC_DEMO_${role}_PASSWORD in .env.local`);
-    }
-    return { email, password };
-};
 
 // People.email is not unique in the schema, so look it up first to avoid duplicates.
 const upsertPerson = async ({ email, password, ...data }) => {
@@ -58,20 +50,20 @@ const formatDate = (daysFromToday) => {
 
 const main = async () => {
     const admin = await upsertPerson({
-        ...getCredentials("ADMIN"),
+        ...accounts.admin,
         firstName: "Demo",
         lastName: "Admin",
         role: 0,
     });
 
     const teacher = await upsertPerson({
-        ...getCredentials("TEACHER"),
+        ...accounts.teacher,
         ...DEMO_TEACHER_NAME,
         role: 1,
     });
 
     const student = await upsertPerson({
-        ...getCredentials("STUDENT"),
+        ...accounts.student,
         firstName: "Demo",
         lastName: "Student",
         homeAddress: "123 Sample Street",

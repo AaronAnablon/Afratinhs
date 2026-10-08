@@ -1,0 +1,5 @@
+{
+    "admin": { "email": "demo.admin@example.com", "password": "DemoAdmin@123" },
+    "teacher": { "email": "demo.teacher@example.com", "password": "DemoTeacher@123" },
+    "student": { "email": "demo.student@example.com", "password": "DemoStudent@123" }
+}

@@ -4,11 +4,10 @@ Attendance Facial Recognition App for Talangan Integrated National High School. 
 
 ## Demo accounts
 
-The homepage lists demo Admin, Teacher and Student logins that visitors can use with one click.
+The homepage lists demo Admin, Teacher and Student logins that visitors can use with one click. The emails and passwords are in `src/globalData/demoAccounts/accounts.json`.
 
-1. Copy `.env.local.example` to `.env.local` and fill in the database and Cloudinary values. The `NEXT_PUBLIC_DEMO_*` variables hold the demo emails and passwords.
-2. Run `npm run seed:demo` to create the three accounts, a "Demo Section" and a few class schedules. Running it again resets the demo passwords and schedules.
-3. On Vercel, add the same `NEXT_PUBLIC_DEMO_*` variables to the project settings and redeploy.
+1. Copy `.env.local.example` to `.env.local` and fill in the database and Cloudinary values.
+2. Run `npm run seed:demo` to create the three accounts, a "Demo Section" and a few class schedules in that database. Running it again resets the demo passwords and schedules.
 
 Anyone using the admin demo can view and change every record, so use a separate database for a public demo.
 
